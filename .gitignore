@@ -1,0 +1,10 @@
+# 运行数据（含账户、会话、个人论文）一律不入库
+skills/research-agent/data/*
+!skills/research-agent/data/.gitkeep
+__pycache__/
+*.pyc
+*.log
+exe-build/
+profile/
+*.docx
+*.zip

@@ -1,0 +1,782 @@
+{
+ "meta": {
+  "updated": "2026-09",
+  "warning": "IF 与分区为参考值，逐年变动。选刊前必须以最新 JCR / 中科院分区表核实，脚本只做初筛，不做决策。",
+  "sources_to_check": [
+   "Web of Science - Journal Citation Reports",
+   "中科院文献情报中心分区表",
+   "期刊官网 Aim & Scope"
+  ]
+ },
+ "journals": [
+  {
+   "name": "IEEE Transactions on Intelligent Transportation Systems",
+   "abbr": "IEEE T-ITS",
+   "publisher": "IEEE",
+   "if": 8.4,
+   "jcr": "Q1",
+   "cas": "1区 Top",
+   "cycle_weeks": [
+    12,
+    24
+   ],
+   "apc": "混合出版；OA 约 USD 2045",
+   "scope": [
+    "intelligent transportation",
+    "vehicular",
+    "uav",
+    "unmanned aerial",
+    "traffic",
+    "autonomous",
+    "federated learning",
+    "security",
+    "intrusion detection",
+    "reinforcement learning",
+    "edge computing",
+    "digital twin",
+    "sensor fusion"
+   ],
+   "url": "https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=6979",
+   "region": "intl"
+  },
+  {
+   "name": "Digital Communications and Networks",
+   "abbr": "DCN",
+   "publisher": "KeAi / Elsevier",
+   "if": 7.5,
+   "jcr": "Q1",
+   "cas": "1区",
+   "cycle_weeks": [
+    8,
+    16
+   ],
+   "apc": "OA；约 USD 1000（常有减免）",
+   "scope": [
+    "network",
+    "communications",
+    "uav",
+    "flying ad hoc",
+    "iot",
+    "network security",
+    "intrusion detection",
+    "machine learning",
+    "deep learning",
+    "resource allocation",
+    "edge computing",
+    "6g",
+    "wireless"
+   ],
+   "url": "https://www.sciencedirect.com/journal/digital-communications-and-networks",
+   "region": "intl"
+  },
+  {
+   "name": "IEEE Transactions on Information Forensics and Security",
+   "abbr": "IEEE TIFS",
+   "publisher": "IEEE",
+   "if": 6.3,
+   "jcr": "Q1",
+   "cas": "1区 Top",
+   "cycle_weeks": [
+    16,
+    30
+   ],
+   "apc": "混合出版；OA 约 USD 2045",
+   "scope": [
+    "security",
+    "privacy",
+    "intrusion detection",
+    "adversarial",
+    "trust",
+    "anomaly detection",
+    "malware",
+    "forensics",
+    "authentication",
+    "blockchain"
+   ],
+   "url": "https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=10206",
+   "region": "intl"
+  },
+  {
+   "name": "IEEE Transactions on Dependable and Secure Computing",
+   "abbr": "IEEE TDSC",
+   "publisher": "IEEE",
+   "if": 6.0,
+   "jcr": "Q1",
+   "cas": "1区 Top",
+   "cycle_weeks": [
+    16,
+    32
+   ],
+   "apc": "混合出版；OA 约 USD 2045",
+   "scope": [
+    "dependability",
+    "security",
+    "trust",
+    "fault tolerance",
+    "intrusion detection",
+    "adversarial machine learning",
+    "privacy",
+    "reliability",
+    "distributed systems"
+   ],
+   "url": "https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=8858",
+   "region": "intl"
+  },
+  {
+   "name": "IEEE Transactions on Mobile Computing",
+   "abbr": "IEEE TMC",
+   "publisher": "IEEE",
+   "if": 7.7,
+   "jcr": "Q1",
+   "cas": "1区 Top",
+   "cycle_weeks": [
+    14,
+    28
+   ],
+   "apc": "混合出版；OA 约 USD 2045",
+   "scope": [
+    "mobile computing",
+    "wireless",
+    "ad hoc",
+    "uav",
+    "mobility",
+    "edge computing",
+    "federated learning",
+    "localization",
+    "routing",
+    "network protocol"
+   ],
+   "url": "https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=7755",
+   "region": "intl"
+  },
+  {
+   "name": "IEEE Transactions on Wireless Communications",
+   "abbr": "IEEE TWC",
+   "publisher": "IEEE",
+   "if": 8.9,
+   "jcr": "Q1",
+   "cas": "1区 Top",
+   "cycle_weeks": [
+    12,
+    24
+   ],
+   "apc": "混合出版；OA 约 USD 2045",
+   "scope": [
+    "wireless",
+    "uav",
+    "channel",
+    "mimo",
+    "resource allocation",
+    "physical layer security",
+    "flying ad hoc network",
+    "6g",
+    "beamforming",
+    "noma"
+   ],
+   "url": "https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=7693",
+   "region": "intl"
+  },
+  {
+   "name": "IEEE Transactions on Network Science and Engineering",
+   "abbr": "IEEE TNSE",
+   "publisher": "IEEE",
+   "if": 6.7,
+   "jcr": "Q1",
+   "cas": "2区",
+   "cycle_weeks": [
+    12,
+    22
+   ],
+   "apc": "混合出版；OA 约 USD 2045",
+   "scope": [
+    "network science",
+    "graph",
+    "graph neural network",
+    "complex network",
+    "network security",
+    "anomaly detection",
+    "topology",
+    "resilience",
+    "epidemic spreading"
+   ],
+   "url": "https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=8446813",
+   "region": "intl"
+  },
+  {
+   "name": "IEEE Internet of Things Journal",
+   "abbr": "IEEE IoT-J",
+   "publisher": "IEEE",
+   "if": 8.2,
+   "jcr": "Q1",
+   "cas": "1区 Top",
+   "cycle_weeks": [
+    10,
+    20
+   ],
+   "apc": "混合出版；OA 约 USD 2045",
+   "scope": [
+    "internet of things",
+    "iot",
+    "uav",
+    "sensor",
+    "edge computing",
+    "federated learning",
+    "security",
+    "intrusion detection",
+    "industrial iot",
+    "digital twin"
+   ],
+   "url": "https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=6488907",
+   "region": "intl"
+  },
+  {
+   "name": "IEEE Transactions on Industrial Informatics",
+   "abbr": "IEEE TII",
+   "publisher": "IEEE",
+   "if": 11.7,
+   "jcr": "Q1",
+   "cas": "1区 Top",
+   "cycle_weeks": [
+    12,
+    22
+   ],
+   "apc": "混合出版；OA 约 USD 2045",
+   "scope": [
+    "industrial",
+    "iot",
+    "cyber physical",
+    "fault diagnosis",
+    "anomaly detection",
+    "federated learning",
+    "digital twin",
+    "security",
+    "smart manufacturing"
+   ],
+   "url": "https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=9424",
+   "region": "intl"
+  },
+  {
+   "name": "Computers & Security",
+   "abbr": "COSE",
+   "publisher": "Elsevier",
+   "if": 4.8,
+   "jcr": "Q1",
+   "cas": "2区",
+   "cycle_weeks": [
+    10,
+    20
+   ],
+   "apc": "混合出版；OA 约 USD 3400",
+   "scope": [
+    "security",
+    "intrusion detection",
+    "malware",
+    "trust",
+    "access control",
+    "privacy",
+    "anomaly detection",
+    "adversarial",
+    "cyber threat intelligence"
+   ],
+   "url": "https://www.sciencedirect.com/journal/computers-and-security",
+   "region": "intl"
+  },
+  {
+   "name": "Ad Hoc Networks",
+   "abbr": "Ad Hoc Networks",
+   "publisher": "Elsevier",
+   "if": 4.4,
+   "jcr": "Q2",
+   "cas": "3区",
+   "cycle_weeks": [
+    14,
+    26
+   ],
+   "apc": "混合出版；OA 约 USD 3200",
+   "scope": [
+    "ad hoc",
+    "uav",
+    "flying ad hoc network",
+    "vanet",
+    "routing",
+    "mobility",
+    "wireless sensor network",
+    "manet",
+    "topology control",
+    "security"
+   ],
+   "url": "https://www.sciencedirect.com/journal/ad-hoc-networks",
+   "region": "intl"
+  },
+  {
+   "name": "Vehicular Communications",
+   "abbr": "VehCom",
+   "publisher": "Elsevier",
+   "if": 6.0,
+   "jcr": "Q1",
+   "cas": "2区",
+   "cycle_weeks": [
+    8,
+    18
+   ],
+   "apc": "混合出版；OA 约 USD 3000",
+   "scope": [
+    "vehicular",
+    "vanet",
+    "uav",
+    "v2x",
+    "intelligent transportation",
+    "platooning",
+    "security",
+    "resource allocation",
+    "edge"
+   ],
+   "url": "https://www.sciencedirect.com/journal/vehicular-communications",
+   "region": "intl"
+  },
+  {
+   "name": "Computer Networks",
+   "abbr": "ComNet",
+   "publisher": "Elsevier",
+   "if": 4.4,
+   "jcr": "Q2",
+   "cas": "3区",
+   "cycle_weeks": [
+    12,
+    24
+   ],
+   "apc": "混合出版；OA 约 USD 3400",
+   "scope": [
+    "network",
+    "routing",
+    "sdn",
+    "uav",
+    "iot",
+    "security",
+    "intrusion detection",
+    "traffic engineering",
+    "network measurement",
+    "edge computing"
+   ],
+   "url": "https://www.sciencedirect.com/journal/computer-networks",
+   "region": "intl"
+  },
+  {
+   "name": "Expert Systems with Applications",
+   "abbr": "ESWA",
+   "publisher": "Elsevier",
+   "if": 7.5,
+   "jcr": "Q1",
+   "cas": "2区 Top",
+   "cycle_weeks": [
+    8,
+    18
+   ],
+   "apc": "混合出版；OA 约 USD 3600",
+   "scope": [
+    "machine learning",
+    "deep learning",
+    "expert system",
+    "anomaly detection",
+    "classification",
+    "graph neural network",
+    "explainable ai",
+    "feature selection",
+    "ensemble"
+   ],
+   "url": "https://www.sciencedirect.com/journal/expert-systems-with-applications",
+   "region": "intl"
+  },
+  {
+   "name": "Information Fusion",
+   "abbr": "IF",
+   "publisher": "Elsevier",
+   "if": 14.8,
+   "jcr": "Q1",
+   "cas": "1区 Top",
+   "cycle_weeks": [
+    10,
+    22
+   ],
+   "apc": "混合出版；OA 约 USD 3400",
+   "scope": [
+    "information fusion",
+    "multi modal",
+    "sensor fusion",
+    "deep learning",
+    "graph neural network",
+    "uncertainty",
+    "decision making",
+    "trust",
+    "evidence theory"
+   ],
+   "url": "https://www.sciencedirect.com/journal/information-fusion",
+   "region": "intl"
+  },
+  {
+   "name": "Knowledge-Based Systems",
+   "abbr": "KBS",
+   "publisher": "Elsevier",
+   "if": 7.2,
+   "jcr": "Q1",
+   "cas": "1区",
+   "cycle_weeks": [
+    8,
+    16
+   ],
+   "apc": "混合出版；OA 约 USD 3400",
+   "scope": [
+    "knowledge",
+    "machine learning",
+    "graph neural network",
+    "recommendation",
+    "anomaly detection",
+    "explainable ai",
+    "deep learning",
+    "ontology"
+   ],
+   "url": "https://www.sciencedirect.com/journal/knowledge-based-systems",
+   "region": "intl"
+  },
+  {
+   "name": "Future Generation Computer Systems",
+   "abbr": "FGCS",
+   "publisher": "Elsevier",
+   "if": 6.2,
+   "jcr": "Q1",
+   "cas": "2区",
+   "cycle_weeks": [
+    10,
+    20
+   ],
+   "apc": "混合出版；OA 约 USD 3400",
+   "scope": [
+    "cloud",
+    "edge computing",
+    "federated learning",
+    "iot",
+    "distributed",
+    "security",
+    "privacy",
+    "blockchain",
+    "resource scheduling",
+    "uav"
+   ],
+   "url": "https://www.sciencedirect.com/journal/future-generation-computer-systems",
+   "region": "intl"
+  },
+  {
+   "name": "IEEE Transactions on Neural Networks and Learning Systems",
+   "abbr": "IEEE TNNLS",
+   "publisher": "IEEE",
+   "if": 10.2,
+   "jcr": "Q1",
+   "cas": "1区 Top",
+   "cycle_weeks": [
+    14,
+    28
+   ],
+   "apc": "混合出版；OA 约 USD 2045",
+   "scope": [
+    "neural network",
+    "deep learning",
+    "graph neural network",
+    "reinforcement learning",
+    "attention",
+    "representation learning",
+    "explainable ai",
+    "adversarial",
+    "continual learning"
+   ],
+   "url": "https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=5962385",
+   "region": "intl"
+  },
+  {
+   "name": "Pattern Recognition",
+   "abbr": "PR",
+   "publisher": "Elsevier",
+   "if": 7.5,
+   "jcr": "Q1",
+   "cas": "1区 Top",
+   "cycle_weeks": [
+    12,
+    24
+   ],
+   "apc": "混合出版；OA 约 USD 3700",
+   "scope": [
+    "pattern recognition",
+    "deep learning",
+    "graph neural network",
+    "classification",
+    "anomaly detection",
+    "feature learning",
+    "explainable ai",
+    "computer vision"
+   ],
+   "url": "https://www.sciencedirect.com/journal/pattern-recognition",
+   "region": "intl"
+  },
+  {
+   "name": "IEEE Transactions on Vehicular Technology",
+   "abbr": "IEEE TVT",
+   "publisher": "IEEE",
+   "if": 6.1,
+   "jcr": "Q1",
+   "cas": "2区",
+   "cycle_weeks": [
+    12,
+    24
+   ],
+   "apc": "混合出版；OA 约 USD 2045",
+   "scope": [
+    "vehicular",
+    "vanet",
+    "uav",
+    "v2x",
+    "wireless",
+    "mobility",
+    "channel",
+    "resource allocation",
+    "physical layer security"
+   ],
+   "url": "https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=25",
+   "region": "intl"
+  },
+  {
+   "name": "IEEE Access",
+   "abbr": "IEEE Access",
+   "publisher": "IEEE",
+   "if": 3.4,
+   "jcr": "Q2",
+   "cas": "3区",
+   "cycle_weeks": [
+    4,
+    10
+   ],
+   "apc": "全 OA；USD 1950",
+   "scope": [
+    "engineering",
+    "iot",
+    "network",
+    "machine learning",
+    "security",
+    "uav",
+    "wireless",
+    "survey"
+   ],
+   "url": "https://ieeexplore.ieee.org/xpl/RecentIssue.jsp?punumber=6287639",
+   "note": "审稿快、录用率高，但部分单位不认或权重低，投前先确认学校认定规则",
+   "region": "intl"
+  },
+  {
+   "name": "Computer Communications",
+   "abbr": "ComCom",
+   "publisher": "Elsevier",
+   "if": 4.5,
+   "jcr": "Q2",
+   "cas": "3区",
+   "cycle_weeks": [
+    12,
+    22
+   ],
+   "apc": "混合出版；OA 约 USD 3400",
+   "scope": [
+    "network",
+    "protocol",
+    "wireless",
+    "uav",
+    "iot",
+    "security",
+    "routing",
+    "congestion control",
+    "edge"
+   ],
+   "url": "https://www.sciencedirect.com/journal/computer-communications",
+   "region": "intl"
+  },
+  {
+   "name": "计算机学报",
+   "abbr": "计算机学报",
+   "publisher": "中国计算机学会",
+   "if": 0,
+   "jcr": "中文T1",
+   "cas": "CCF推荐中文A类",
+   "cycle_weeks": [
+    6,
+    12
+   ],
+   "apc": "无版面费（多数情况）",
+   "region": "cn",
+   "scope": [
+    "intrusion detection",
+    "network security",
+    "artificial intelligence",
+    "machine learning",
+    "深度学习",
+    "网络安全",
+    "人工智能"
+   ],
+   "url": "http://cjc.ict.ac.cn/"
+  },
+  {
+   "name": "软件学报",
+   "abbr": "软件学报",
+   "publisher": "中国科学院软件研究所",
+   "if": 0,
+   "jcr": "中文T1",
+   "cas": "CCF推荐中文A类",
+   "cycle_weeks": [
+    6,
+    12
+   ],
+   "apc": "无版面费（多数情况）",
+   "region": "cn",
+   "scope": [
+    "software",
+    "security",
+    "deep learning",
+    "网络安全",
+    "软件工程",
+    "人工智能"
+   ],
+   "url": "http://www.jos.org.cn/"
+  },
+  {
+   "name": "计算机研究与发展",
+   "abbr": "计算机研究与发展",
+   "publisher": "中国科学院计算技术研究所",
+   "if": 0,
+   "jcr": "中文T1",
+   "cas": "CCF推荐中文A类",
+   "cycle_weeks": [
+    6,
+    12
+   ],
+   "apc": "无版面费（多数情况）",
+   "region": "cn",
+   "scope": [
+    "network security",
+    "intrusion detection",
+    "federated learning",
+    "网络安全",
+    "入侵检测",
+    "联邦学习"
+   ],
+   "url": "http://crad.ict.ac.cn/"
+  },
+  {
+   "name": "电子学报",
+   "abbr": "电子学报",
+   "publisher": "中国电子学会",
+   "if": 0,
+   "jcr": "中文T1",
+   "cas": "CCF推荐中文A类",
+   "cycle_weeks": [
+    6,
+    12
+   ],
+   "apc": "无版面费（多数情况）",
+   "region": "cn",
+   "scope": [
+    "signal",
+    "security",
+    "uav",
+    "电子技术",
+    "信息安全",
+    "无人机"
+   ],
+   "url": "https://www.ejournal.org.cn/"
+  },
+  {
+   "name": "通信学报",
+   "abbr": "通信学报",
+   "publisher": "中国通信学会",
+   "if": 0,
+   "jcr": "中文T1",
+   "cas": "CCF推荐中文A类",
+   "cycle_weeks": [
+    6,
+    12
+   ],
+   "apc": "无版面费（多数情况）",
+   "region": "cn",
+   "scope": [
+    "communication security",
+    "ad hoc network",
+    "通信安全",
+    "自组网",
+    "入侵检测",
+    "区块链"
+   ],
+   "url": "http://www.joconline.com.cn/"
+  },
+  {
+   "name": "网络与信息安全学报",
+   "abbr": "网络与信息安全学报",
+   "publisher": "中国通信学会",
+   "if": 0,
+   "jcr": "中文核心",
+   "cas": "CCF推荐中文期刊",
+   "cycle_weeks": [
+    8,
+    16
+   ],
+   "apc": "低",
+   "region": "cn",
+   "scope": [
+    "network security",
+    "intrusion detection",
+    "adversarial",
+    "网络安全",
+    "对抗样本",
+    "数据安全"
+   ],
+   "url": "http://www.infocomm-journal.com/tnk/"
+  },
+  {
+   "name": "信息网络安全",
+   "abbr": "信息网络安全",
+   "publisher": "公安部第三研究所",
+   "if": 0,
+   "jcr": "中文核心",
+   "cas": "CCF推荐中文期刊",
+   "cycle_weeks": [
+    8,
+    16
+   ],
+   "apc": "低",
+   "region": "cn",
+   "scope": [
+    "network security",
+    "uav",
+    "low altitude",
+    "网络安全",
+    "低空经济",
+    "等级保护"
+   ],
+   "url": "http://www.netinfo-security.com/"
+  },
+  {
+   "name": "中国科学：信息科学",
+   "abbr": "中国科学·信息科学",
+   "publisher": "中国科学院",
+   "if": 0,
+   "jcr": "中文T1",
+   "cas": "CCF推荐中文A类",
+   "cycle_weeks": [
+    12,
+    24
+   ],
+   "apc": "无版面费",
+   "region": "cn",
+   "scope": [
+    "artificial intelligence",
+    "information security",
+    "人工智能",
+    "信息安全",
+    "可信计算"
+   ],
+   "url": "https://info.scichina.com/"
+  }
+ ]
+}

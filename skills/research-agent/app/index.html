@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>破晓 · 科研智能体 V0.1</title>
+<style>
+  :root{
+    /* 默认皮肤：白蓝（清爽） */
+    --bg:#eef3fb; --panel:#ffffff; --panel2:#f3f7fd; --border:#d8e3f4;
+    --text:#1e2a3d; --muted:#647899; --accent:#2563eb; --accent2:#0ea5e9;
+    --accent-soft:rgba(37,99,235,.10); --shadow:0 6px 22px rgba(37,99,235,.10);
+    --warn:#d97706; --err:#dc2626; --ok:#16a34a; --code-bg:#0f172a; --code-fg:#e2e8f0;
+  }
+  html[data-skin="dark"]{
+    --bg:#0d1320; --panel:#141d2e; --panel2:#1b2638; --border:#27324a;
+    --text:#e7eefb; --muted:#93a3c2; --accent:#3b82f6; --accent2:#38bdf8;
+    --accent-soft:rgba(59,130,246,.16); --shadow:0 6px 22px rgba(0,0,0,.35);
+    --warn:#f59e0b; --err:#f87171; --ok:#34d399; --code-bg:#0a0f1a; --code-fg:#cbd5e1;
+  }
+  html[data-skin="pink"]{
+    --bg:#fdf2f6; --panel:#ffffff; --panel2:#fdf4f8; --border:#f5d9e5;
+    --text:#3d2230; --muted:#a06b87; --accent:#db2777; --accent2:#f472b6;
+    --accent-soft:rgba(219,39,119,.10); --shadow:0 6px 22px rgba(219,39,119,.10);
+    --warn:#d97706; --err:#dc2626; --ok:#16a34a; --code-bg:#2a1420; --code-fg:#fce7f1;
+  }
+  html[data-skin="green"]{
+    --bg:#eef7f4; --panel:#ffffff; --panel2:#f1f8f5; --border:#d3e8e0;
+    --text:#1d2b27; --muted:#5c7a70; --accent:#0d9488; --accent2:#14b8a6;
+    --accent-soft:rgba(13,148,136,.10); --shadow:0 6px 22px rgba(13,148,136,.10);
+    --warn:#c2780c; --err:#dc2626; --ok:#16a34a; --code-bg:#0f172a; --code-fg:#e2e8f0;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg); color:var(--text);
+    font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    transition:background .25s,color .25s;
+  }
+  .layout{display:flex;min-height:100vh}
+  .sidebar{width:216px;background:var(--panel);border-right:1px solid var(--border);padding:18px 0;flex-shrink:0;display:flex;flex-direction:column}
+  .brand{padding:0 18px 16px;font-weight:700;font-size:15px;border-bottom:1px solid var(--border);color:var(--text)}
+  .brand small{display:block;color:var(--muted);font-weight:400;font-size:11px;margin-top:3px}
+  .nav{padding:10px 0;flex:1;overflow:auto}
+  .nav button{
+    display:block;width:100%;text-align:left;background:none;border:0;color:var(--muted);
+    padding:10px 18px;cursor:pointer;font-size:13.5px;border-left:3px solid transparent;border-radius:0;
+  }
+  .nav button:hover{background:var(--panel2);color:var(--text)}
+  .nav button.active{color:var(--accent);background:var(--accent-soft);border-left-color:var(--accent);font-weight:600}
+  .main{width:100%;max-width:1120px;margin:0 auto;padding:22px 32px;overflow:visible}
+  .mainwrap{flex:1;display:flex;flex-direction:column;min-width:0}
+  .topbar{
+    display:flex;justify-content:flex-end;align-items:center;gap:16px;padding:9px 24px;
+    background:var(--panel);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:30;
+  }
+  .topbar .userbar{display:flex;align-items:center;gap:8px;margin:0;padding:0;border:0;font-size:13px}
+  .topbar .userbar .who{margin:0}
+  .topbar .skins{margin:0;padding:0}
+  h1{font-size:20px;margin:0 0 4px;color:var(--text)}
+  .sub{color:var(--muted);margin:0 0 22px;font-size:12.5px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:18px;box-shadow:var(--shadow)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:820px){.grid{grid-template-columns:1fr}}
+  label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
+  input,textarea,select{
+    width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit;transition:border-color .15s,box-shadow .15s;
+  }
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  textarea{resize:vertical;min-height:120px;font-family:"SFMono-Regular",Consolas,monospace;font-size:12px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .row > div{flex:1;min-width:120px}
+  button.run{
+    background:var(--accent);color:#fff;border:0;border-radius:8px;padding:10px 20px;
+    font-size:13.5px;font-weight:600;cursor:pointer;margin-top:14px;transition:filter .15s,transform .05s;
+  }
+  button.run:hover{filter:brightness(1.07)}
+  button.run:active{transform:translateY(1px)}
+  button.run:disabled{opacity:.5;cursor:not-allowed}
+  button.ghost{background:transparent;border:1px solid var(--border);color:var(--muted)}
+  button.ghost:hover{border-color:var(--accent);color:var(--accent)}
+  .status{margin-top:12px;font-size:12.5px;color:var(--muted)}
+  .status.ok{color:var(--ok)} .status.err{color:var(--err)} .status.warn{color:var(--warn)}
+  .out{margin-top:14px}
+  .hidden{display:none}
+  /* markdown render */
+  .md h1,.md h2,.md h3{line-height:1.3;margin:16px 0 8px}
+  .md h1{font-size:18px;border-bottom:1px solid var(--border);padding-bottom:6px;color:var(--text)}
+  .md h2{font-size:15.5px;color:var(--accent2)}
+  .md h3{font-size:14px;color:var(--text)}
+  .md p{margin:8px 0}
+  .md blockquote{border-left:3px solid var(--accent);margin:10px 0;padding:6px 12px;background:var(--panel2);color:var(--muted);border-radius:0 6px 6px 0}
+  .md code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-family:Consolas,monospace;font-size:12px;color:var(--accent)}
+  .md pre{background:var(--code-bg);border:1px solid var(--border);padding:12px;border-radius:8px;overflow:auto}
+  .md pre code{background:none;padding:0;color:var(--code-fg)}
+  .md ul{margin:8px 0;padding-left:20px}
+  .md li{margin:3px 0}
+  .md table{border-collapse:collapse;width:100%;margin:12px 0;font-size:12.5px}
+  .md th,.md td{border:1px solid var(--border);padding:7px 9px;text-align:left;vertical-align:top}
+  .md th{background:var(--panel2);color:var(--text);font-weight:600}
+  .md tr:nth-child(even) td{background:var(--accent-soft)}
+  .md strong{color:var(--text);font-weight:700}
+  .md svg{max-width:100%;height:auto;background:#fff;border:1px solid var(--border);border-radius:8px;margin:10px 0}
+  .tag{display:inline-block;background:var(--panel2);border:1px solid var(--border);border-radius:20px;padding:2px 10px;font-size:11px;color:var(--muted);margin-left:8px}
+  .card h3{font-size:14.5px;margin:0 0 6px;color:var(--accent2)}
+  .btn-mini{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:3px 9px;font-size:12px;cursor:pointer;margin:2px 3px 2px 0;transition:.15s}
+  .btn-mini:hover{border-color:var(--accent);color:var(--accent)}
+  .btn-mini.danger:hover{border-color:var(--err);color:var(--err)}
+  .tbl{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px}
+  .tbl th,.tbl td{border:1px solid var(--border);padding:7px 9px;text-align:left}
+  .tbl th{background:var(--panel2);color:var(--text)}
+  /* 对话 */
+  .chat-card{display:flex;flex-direction:column;height:calc(100vh - 150px)}
+  .chat-log{flex:1;overflow:auto;padding:6px 2px}
+  .bubble{max-width:84%;margin:12px 0;padding:11px 14px;border-radius:14px;line-height:1.6;font-size:13.5px;word-break:break-word}
+  .bubble.user{margin-left:auto;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+  .bubble.agent{margin-right:auto;background:var(--panel);border:1px solid var(--border);border-bottom-left-radius:4px;box-shadow:var(--shadow)}
+  .bubble .md{font-size:13.5px}
+  .bubble .md h1,.bubble .md h2,.bubble .md h3{margin:10px 0 6px}
+  .bubble .md h1{font-size:15px}.bubble .md h2{font-size:14px}.bubble .md h3{font-size:13px}
+  .bubble .md table{font-size:12px;margin:8px 0}
+  .bubble .md pre{margin:8px 0}
+  .chat-input{display:flex;gap:10px;align-items:flex-end;margin-top:12px}
+  .chat-input textarea{flex:1;min-height:48px;max-height:160px}
+  .chat-input button{margin-top:0;white-space:nowrap}
+  .chat-hint{color:var(--muted);font-size:12px;margin:2px 0 0}
+  /* 用户态 / 登录注册 */
+  .userbar{padding:12px 18px;border-top:1px solid var(--border);margin-top:auto;font-size:13px}
+  .userbar .who{color:var(--text);margin-bottom:8px}
+  .userbar .who b{color:var(--accent)}
+  .userbar button{font-size:12.5px;padding:6px 12px;margin:4px 6px 0 0}
+  .skins{display:flex;gap:6px;padding:0 18px 12px;align-items:center}
+  .skins .lbl{font-size:11px;color:var(--muted);margin-right:2px}
+  .skin-btn{width:20px;height:20px;border-radius:50%;border:2px solid var(--border);cursor:pointer;padding:0;transition:.15s}
+  .skin-btn[data-skin="blue"]{background:linear-gradient(135deg,#2563eb,#0ea5e9)}
+  .skin-btn[data-skin="dark"]{background:linear-gradient(135deg,#1b2638,#3b82f6)}
+  .skin-btn[data-skin="green"]{background:linear-gradient(135deg,#0d9488,#14b8a6)}
+  .skin-btn.active{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+  .modal-mask{position:fixed;inset:0;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;z-index:50}
+  .modal{width:340px;max-width:92vw;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px}
+  .modal h3{margin:0 0 14px;font-size:15px}
+  .modal .row{margin-bottom:4px}
+  .switch{color:var(--accent);cursor:pointer;font-size:12.5px;margin-top:12px;display:inline-block}
+  .tagrole{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;margin-left:6px}
+  .tagrole.admin{background:var(--accent-soft);color:var(--accent)}
+  .tagrole.member{background:var(--panel2);color:var(--muted)}
+  .acct-tbl td .btn-mini{margin:1px 2px}
+  /* 论文引导流程图 */
+  .g-flow{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .g-node{
+    display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1.5px solid var(--border);
+    color:var(--text);border-radius:20px;padding:7px 14px;font-size:13px;cursor:pointer;transition:all .15s;
+  }
+  .g-node:hover{border-color:var(--accent);transform:translateY(-1px)}
+  .g-node.active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .g-node.done{border-color:var(--ok);background:rgba(22,163,74,.10)}
+  .g-node.done .tick{color:var(--ok);font-weight:700}
+  .g-arrow{color:var(--muted);font-size:13px}
+  /* 侧栏折叠分组 */
+  .nav-head{
+    display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;
+    background:none;border:0;color:var(--muted);padding:10px 18px 4px;
+    font-size:11.5px;font-weight:700;letter-spacing:.04em;cursor:pointer;border-radius:0;
+  }
+  .nav-head:hover{color:var(--text)}
+  .nav-head .caret{transition:transform .15s;font-size:10px}
+  .nav-group.collapsed .nav-sub{display:none}
+  .nav-group.collapsed .caret{transform:rotate(-90deg)}
+  .nav-sub button{padding-left:28px;font-size:13px}
+  /* 文件上传按钮美化 */
+  input[type="file"]{
+    color:var(--muted);font-size:12.5px;border:1px dashed var(--border);border-radius:8px;
+    padding:6px 10px;background:var(--panel2);cursor:pointer;max-width:250px;
+  }
+  input[type="file"]::file-selector-button{
+    background:var(--accent);color:#fff;border:0;border-radius:6px;
+    padding:6px 12px;margin-right:10px;cursor:pointer;font-size:12.5px;font-weight:600;
+  }
+  input[type="file"]::file-selector-button:hover{filter:brightness(1.08)}
+  /* 顶栏已打开页面标签 */
+  .top-tabs{display:flex;gap:6px;overflow:auto;max-width:50%;margin-right:auto}
+  .top-tab{
+    white-space:nowrap;background:var(--panel2);border:1px solid var(--border);color:var(--muted);
+    border-radius:16px;padding:4px 12px;font-size:12px;cursor:pointer;
+  }
+  .top-tab:hover{color:var(--text)}
+  .top-tab.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .tab-x{margin-left:6px;opacity:.55;cursor:pointer;font-size:10px}
+  .tab-x:hover{opacity:1;color:var(--err)}
+  /* 全站登录门禁 */
+  .gate{display:none;position:fixed;inset:0;z-index:100;align-items:center;justify-content:center;
+    background:radial-gradient(1200px 600px at 50% -10%, var(--accent-soft), var(--bg));}
+  body.logged-out .gate{display:flex}
+  body.logged-out .layout{display:none}
+  .gate .card{width:380px;max-width:92vw;text-align:center;box-shadow:0 20px 60px rgba(37,99,235,.18)}
+  .gate .logo{font-size:34px;margin-bottom:6px}
+  .gate .card h1{color:var(--accent)}
+  .gate .skins{justify-content:center;padding:0;margin-top:18px}
+</style>
+</head>
+<body class="logged-out">
+<div id="gate" class="gate">
+  <div class="card">
+    <div class="logo">🛰️</div>
+    <h1 style="margin:0 0 4px">破晓</h1>
+    <p class="sub" style="margin:0 0 18px">科研智能体 · V0.1 · by B_Dawn · 请登录后使用</p>
+    <div class="row"><div style="flex:1"><label>用户名</label><input id="g-name" placeholder="请输入用户名" autocomplete="username"></div></div>
+    <div class="row hidden" id="g-display-row"><div style="flex:1"><label>显示名（仅注册时填写，登录后在系统界面展示）</label><input id="g-display" placeholder="如：张三"></div></div>
+    <div class="row"><div style="flex:1"><label>密码</label><input id="g-pwd" type="password" placeholder="请输入密码" autocomplete="current-password"></div></div>
+    <div class="status" id="g-status"></div>
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button class="run" id="g-login">登录</button>
+      <button class="run ghost" id="g-reg">注册新账户</button>
+    </div>
+    <p style="color:var(--muted);font-size:12px;margin-top:14px">首次使用请以管理员账户登录；新成员可在此自助注册，或由管理员在「设置 → 账户管理」创建。</p>
+    <div class="skins" id="skins-gate"></div>
+  </div>
+</div>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">破晓<small>科研智能体 · V0.1 · by B_Dawn</small></div>
+    <nav class="nav" id="nav">
+      <button data-tab="guide">🧭 论文十步走</button>
+      <button data-tab="chat" class="active">💬 智能对话</button>
+      <div class="nav-group">
+        <button class="nav-head">📚 文献与精读<span class="caret">▾</span></button>
+        <div class="nav-sub">
+          <button data-tab="search">文献检索</button>
+          <button data-tab="reflib">文献库</button>
+          <button data-tab="matrix">对比矩阵</button>
+          <button data-tab="digest">论文精读</button>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button class="nav-head">✍️ 写作与投稿<span class="caret">▾</span></button>
+        <div class="nav-sub">
+          <button data-tab="write">写作综述</button>
+          <button data-tab="mypaper">我的论文</button>
+          <button data-tab="journal">选刊</button>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button class="nav-head">🧪 实验与数据<span class="caret">▾</span></button>
+        <div class="nav-sub">
+          <button data-tab="lab">实验台账</button>
+          <button data-tab="stat">统计分析</button>
+          <button data-tab="algo">算法与训练</button>
+          <button data-tab="plot">出图</button>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button class="nav-head">🤝 团队协作<span class="caret">▾</span></button>
+        <div class="nav-sub">
+          <button data-tab="collab">合作对接</button>
+          <button data-tab="team">协作中心</button>
+          <button data-tab="paper">论文协作</button>
+          <button data-tab="reviewhub">评审工作台</button>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button class="nav-head">⚙️ 个人中心<span class="caret">▾</span></button>
+        <div class="nav-sub">
+          <button data-tab="profile">科研画像</button>
+          <button data-tab="recommend">方向推荐</button>
+          <button data-tab="memory">长期记忆</button>
+          <button data-tab="settings">设置</button>
+        </div>
+      </div>
+      <div class="nav-group" id="nav-admin" style="display:none">
+        <button class="nav-head">🛡️ 管理员<span class="caret">▾</span></button>
+        <div class="nav-sub">
+          <button data-tab="accounts">账户管理</button>
+        </div>
+      </div>
+    </nav>
+  </aside>
+  <div class="mainwrap">
+    <div class="topbar">
+      <div class="top-tabs" id="top-tabs"></div>
+      <div class="skins" id="skins-top"></div>
+      <div class="userbar" id="userbar-top"></div>
+    </div>
+    <main class="main">
+    <h1 id="tabTitle">文献检索</h1>
+    <p class="sub" id="tabSub"></p>
+
+    <!-- 智能对话 -->
+    <section data-pane="chat">
+      <div class="card chat-card">
+        <div class="chat-log" id="chat-log"></div>
+        <div class="row" style="margin-top:10px;align-items:center">
+          <div><label>本次对话模型</label><select id="chat-model" style="min-width:170px"><option value="">全局配置（默认）</option></select></div>
+        </div>
+        <div class="chat-input">
+          <textarea id="chat-in" rows="2"
+            placeholder="问我：检索 UAV 入侵检测近三年论文 / 生成对比矩阵 / 帮我选刊：&lt;粘贴摘要&gt; / 推荐下个方向 …（Enter 发送，Shift+Enter 换行）"></textarea>
+          <button class="run" id="chat-btn">发送</button>
+        </div>
+        <p class="chat-hint">自然语言即可。检索结果、对比矩阵、选刊打分、方向推荐会直接以 Markdown 显示在对话里。上方可为本轮对话切换 API/模型，或运行「技能中心」的技能。</p>
+      </div>
+    </section>
+
+    <!-- 文献检索 -->
+    <section data-pane="search">
+      <div class="card">
+        <div class="row">
+          <div style="flex:3">
+            <label>检索式（建议英文）</label>
+            <input id="s-query" value="UAV ad hoc network intrusion detection" placeholder="如 graph neural network IDS">
+          </div>
+          <div>
+            <label>数据源</label>
+            <input id="s-sources" value="arxiv,openalex,crossref,s2">
+          </div>
+          <div>
+            <label>每源上限</label>
+            <input id="s-limit" type="number" value="20">
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>起始年（可选）</label>
+            <input id="s-from" type="number" placeholder="2023">
+          </div>
+          <div>
+            <label>截止年（可选）</label>
+            <input id="s-to" type="number" placeholder="2026">
+          </div>
+        </div>
+        <button class="run" data-act="search">检索</button>
+        <div class="status" id="s-status"></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px">
+          <button class="run ghost" id="s-use-direction" style="margin-top:0">用我的最终方向调研</button>
+          <label style="margin:10px 0 0;display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12.5px">
+            <input type="checkbox" id="s-use-strategy" style="width:auto" checked> 检索前调用「调研策略」技能（先定边界）
+          </label>
+          <button class="run ghost" id="s-strategy" style="margin-top:0">让 AI 出调研策略（先定边界再搜）</button>
+        </div>
+      </div>
+      <div class="card out hidden" id="s-strat-out"><div class="md" id="s-strat-md"></div></div>
+      <div class="card out hidden" id="s-out"><div class="md" id="s-md"></div></div>
+      <div class="card out hidden" id="s-collect">
+        <h3 style="margin-top:0">收录到文献库 <span style="font-weight:400;color:var(--muted);font-size:12px">（勾选 → 存入参考文献文件夹；文献只来自上面真实检索结果）</span></h3>
+        <div class="row">
+          <div style="flex:2"><label>目标文件夹</label><select id="rf-sel-quick"></select></div>
+          <div><label>新文件夹名（没有就建）</label><input id="rf-new-quick" placeholder="可选"></div>
+          <div><label>&nbsp;</label><button class="run" id="rf-collect" style="margin-top:0">收录勾选文献</button></div>
+        </div>
+        <div class="out" id="rf-collect-list" style="max-height:260px;overflow:auto"></div>
+        <span class="status" id="rf-collect-status"></span>
+      </div>
+    </section>
+
+    <!-- 对比矩阵 -->
+    <section data-pane="matrix" class="hidden">
+      <div class="card">
+        <p style="color:var(--muted);margin-top:0">默认基于「上一次检索结果」生成；也可粘贴检索 JSON 文本。</p>
+        <label>排序</label>
+        <select id="m-sort">
+          <option value="year">年份</option>
+          <option value="citation">被引</option>
+          <option value="title">标题</option>
+        </select>
+        <label>最多行数（0=不限）</label>
+        <input id="m-max" type="number" value="0">
+        <label>粘贴检索 JSON（可选，覆盖上一次结果）</label>
+        <textarea id="m-json" placeholder='{"query":"...","records":[...]}'></textarea>
+        <button class="run" data-act="matrix">生成矩阵</button>
+        <div class="status" id="m-status"></div>
+      </div>
+      <div class="card out hidden" id="m-out"><div class="md" id="m-md"></div></div>
+    </section>
+
+    <!-- 出图 -->
+    <section data-pane="plot" class="hidden">
+      <div class="card">
+        <label>CSV 内容（首行为表头）</label>
+        <textarea id="p-csv">epochs,Ours,GAT,Baseline
+10,0.712,0.681,0.654
+20,0.803,0.762,0.723
+30,0.861,0.815,0.771
+40,0.897,0.848,0.802
+50,0.921,0.869,0.818</textarea>
+        <div class="row">
+          <div><label>横轴列</label><input id="p-x" value="epochs"></div>
+          <div><label>纵轴列（逗号分隔）</label><input id="p-y" value="Ours,GAT,Baseline"></div>
+          <div><label>类型</label>
+            <select id="p-type"><option value="line">折线</option><option value="bar">柱状</option><option value="scatter">散点</option></select>
+          </div>
+        </div>
+        <div class="row">
+          <div><label>标题</label><input id="p-title" value="Detection Accuracy vs. Epochs"></div>
+          <div><label>横轴标签</label><input id="p-xlabel" value="Epoch"></div>
+          <div><label>纵轴标签</label><input id="p-ylabel" value="F1-score"></div>
+        </div>
+        <button class="run" data-act="plot">出图</button>
+        <div class="status" id="p-status"></div>
+      </div>
+      <div class="card out hidden" id="p-out"><div id="p-svg"></div></div>
+
+      <div class="card">
+        <h3 style="margin-top:0">绘图红线自查 <span style="font-weight:400;color:var(--muted);font-size:12px">（硬红线：AI 整图生成绝不能进论文——像素不可追溯=诚信问题；本页出图为 Python 矢量 SVG，可进论文）</span></h3>
+        <button class="run ghost" id="pl-redline" style="margin-top:0">运行「科研绘图红线检查」技能</button>
+        <span class="status" id="pl-redline-status"></span>
+        <div class="out hidden" id="pl-redline-out"><div class="md" id="pl-redline-md"></div></div>
+      </div>
+    </section>
+
+    <!-- 选刊 -->
+    <section data-pane="journal" class="hidden">
+      <div class="card">
+        <label>摘要 / 关键词（≥40 字，英文为佳）</label>
+        <textarea id="j-text">Intrusion detection systems in UAV ad hoc networks lack decision trust. We propose a graph-augmented dual-layer AI trust framework with spatio-temporal GNN and explainable credibility monitoring, achieving +6.4 F1 over graph baselines and 41% fewer false alarms under topology churn.</textarea>
+        <div class="row">
+          <div><label>期刊范围</label>
+            <select id="j-scope"><option value="all">全部期刊</option><option value="intl">国际期刊</option><option value="cn">国内期刊</option></select></div>
+          <div><label>目标 IF</label><input id="j-if" type="number" step="0.1" value="7"></div>
+          <div><label>显示前 N</label><input id="j-top" type="number" value="6"></div>
+          <div><label>最低 IF（0=不限）</label><input id="j-min" type="number" step="0.1" value="0"></div>
+        </div>
+        <button class="run" data-act="journal">选刊匹配</button>
+        <div class="status" id="j-status"></div>
+      </div>
+      <div class="card out hidden" id="j-out"><div class="md" id="j-md"></div></div>
+    </section>
+
+    <!-- 方向推荐 -->
+    <section data-pane="recommend" class="hidden">
+      <div class="card">
+        <label>画像来源</label>
+        <input id="r-profile" value="profile/researcher-profile.md（自动查找）" disabled>
+        <div class="row">
+          <div><label>交叉检索上限</label><input id="r-mq" type="number" value="8"></div>
+          <div><label>热度窗口（年）</label><input id="r-years" type="number" value="3"></div>
+          <div><label>每条取多少篇</label><input id="r-limit" type="number" value="10"></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;color:var(--text)">
+          <input type="checkbox" id="r-offline" style="width:auto"> 离线模式（不联网，只给矩阵骨架）
+        </label>
+        <button class="run" data-act="recommend">规则引擎推荐</button>
+        <button class="run ghost" id="ra-ai" style="margin-top:10px">AI 深度推荐（需模型）</button>
+        <div class="status" id="r-status"></div>
+      </div>
+      <div class="card out hidden" id="r-out"><div class="md" id="r-md"></div></div>
+      <div class="card out hidden" id="ra-ai-out"><div class="md" id="ra-ai-md"></div></div>
+    </section>
+
+    <!-- 画像 -->
+    <section data-pane="profile" class="hidden">
+      <div class="card">
+        <h3 style="margin-top:0">我的输入 · AI 判断</h3>
+        <p style="color:var(--muted);margin-top:0">把你真实的研究情况填进来（可只填一部分），保存后点「AI 诊断」让模型基于你的输入做判断与建议——不再只靠关键词规则。</p>
+        <div class="row">
+          <div><label>研究方向（中文）</label><input id="pe-direction_cn" placeholder="AI + 低空经济安全"></div>
+          <div><label>研究方向（英文，给 AI/检索用）</label><input id="pe-direction_en" placeholder="AI for low-altitude economy security"></div>
+        </div>
+        <div class="row">
+          <div style="flex:2"><label>技能栈（逗号分隔）</label><input id="pe-skills" placeholder="GNN, 可解释 AI, 入侵检测, UAV 自组网"></div>
+          <div><label>目标期刊（逗号分隔）</label><input id="pe-target_journals" placeholder="IEEE T-ITS, DCN"></div>
+        </div>
+        <label>在投 / 已发表工作</label>
+        <textarea id="pe-works" style="min-height:52px" placeholder="T1：《Explainable Decision-Credibility Monitoring for IDS in UAV Ad Hoc Networks…》，目标 SCI Q2 IF≥7"></textarea>
+        <label>创新点 N1–N5（每行一条，可贴你论文里的表述）</label>
+        <textarea id="pe-innovations" style="min-height:76px" placeholder="N1：…\nN2：…"></textarea>
+        <label>时间 / 资源约束（很重要，AI 推荐方向会按它取舍）</label>
+        <input id="pe-constraints" placeholder="三线并行（教学/科研/写作），每周科研约 10h，单卡 GPU">
+        <label>短期目标</label>
+        <input id="pe-goals" placeholder="3 个月内完成 T1 投稿所需实验">
+        <div class="row">
+          <button class="run" id="pe-save">保存我的输入</button>
+          <button class="run ghost" id="pe-ai">AI 诊断画像（需模型）</button>
+          <button class="run ghost" data-act="profile">解析本地画像文件</button>
+        </div>
+        <div class="status" id="pe-status"></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">确认最终研究方向 <span style="font-weight:400;color:var(--muted);font-size:12px">（AI 判断 + 人工修改后的定稿方向；后续文献调研/雷达都以此为准）</span></h3>
+        <div class="row">
+          <div style="flex:3"><label>最终研究方向（一句话，可随时人工修改）</label><input id="wf-direction" placeholder=""></div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="run" id="wf-save">保存方向</button>
+          <button class="run ghost" id="wf-goto-search">带着方向去文献调研 →</button>
+          <button class="run ghost" id="wf-socratic">苏格拉底式追问这个方向</button>
+          <span class="status" id="wf-status"></span>
+        </div>
+        <div class="out hidden" id="wf-out"><div class="md" id="wf-md"></div></div>
+      </div>
+      <div class="card out hidden" id="pf-out"><pre class="md" id="pf-txt" style="white-space:pre-wrap"></pre></div>
+    </section>
+
+    <!-- 合作对接 -->
+    <section data-pane="collab" class="hidden">
+      <div class="card">
+        <h3 style="margin-top:0">合作对接 <span style="font-weight:400;color:var(--muted);font-size:12px">（向本系统其他注册用户发起合作邀请；对方接受后互为合作者）</span></h3>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="run ghost" id="cb-refresh" style="margin-top:0">刷新目录与邀请</button>
+          <span class="status" id="cb-status"></span>
+        </div>
+        <h3 style="margin:14px 0 4px;font-size:13.5px">用户目录</h3>
+        <div class="out" id="cb-dir"></div>
+        <h3 style="margin:14px 0 4px;font-size:13.5px">收到的邀请</h3>
+        <div class="out" id="cb-inbox"></div>
+        <h3 style="margin:14px 0 4px;font-size:13.5px">已发出的邀请</h3>
+        <div class="out" id="cb-sent"></div>
+        <h3 style="margin:14px 0 4px;font-size:13.5px">我的合作者</h3>
+        <div class="out" id="cb-partners"></div>
+        <p style="color:var(--muted);font-size:12px;margin:8px 0 0">接受邀请后互为合作者；再到「论文协作」把对方加为具体论文的协作者（可编辑/仅查看），项目会自动收录进对方「我的论文」。本服务仅监听本机，跨设备协作需将服务部署到局域网可达的主机。</p>
+      </div>
+    </section>
+
+    <!-- 协作中心（成员与任务） -->
+    <section data-pane="team" class="hidden">
+      <div class="grid">
+        <div class="card">
+          <h3 style="margin-top:0">成员</h3>
+          <div class="row">
+            <div><label>姓名</label><input id="tm-name" placeholder="张三"></div>
+            <div><label>角色</label>
+              <select id="tm-role"><option>负责人</option><option>成员</option><option>合作者</option></select>
+            </div>
+          </div>
+          <div class="row">
+            <div><label>专长（逗号分隔）</label><input id="tm-skills" placeholder="GNN, 可解释 AI, 低空安全"></div>
+            <div><label>备注</label><input id="tm-note" placeholder="导师 / 同门…"></div>
+          </div>
+          <button class="run" id="tm-add">添加成员</button>
+          <div class="out"><div class="md" id="tm-list"></div></div>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">任务板</h3>
+          <div class="row">
+            <div style="flex:2"><label>任务标题</label><input id="tk-title" placeholder="补实验：拓扑变化鲁棒性"></div>
+            <div><label>指派（协作人）</label><select id="tk-assignee"></select></div>
+          </div>
+          <div class="row">
+            <div><label>优先级</label><select id="tk-priority"><option>高</option><option selected>中</option><option>低</option></select></div>
+            <div><label>模块</label>
+              <select id="tk-module"><option>experiment</option><option>writing</option><option>review</option><option>search</option><option>general</option></select>
+            </div>
+          </div>
+          <button class="run" id="tk-add">添加任务</button>
+          <div class="status" id="tk-status"></div>
+          <div class="out"><div class="md" id="tk-board"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 论文协作 -->
+    <section data-pane="paper" class="hidden">
+      <div class="card">
+        <h3 style="margin-top:0">论文协作</h3>
+        <div class="row">
+          <div style="flex:3"><label>论文标题</label><input id="pp-title" placeholder="Explainable Decision-Credibility Monitoring for IDS in UAV Ad Hoc Networks"></div>
+          <div><label>负责人（协作人）</label><select id="pp-owner"></select></div>
+          <div><label>目标期刊</label><input id="pp-journal" placeholder="Digital Communications and Networks"></div>
+        </div>
+        <div class="row">
+          <div><button class="run" id="pp-create" style="margin-top:14px">创建论文项目</button></div>
+          <div style="flex:2"><label>切换论文</label><select id="pp-sel" onchange="window.loadPaper&&loadPaper()"></select></div>
+          <div><label>&nbsp;</label><button class="run ghost" id="pp-del" style="margin-top:0">删除当前项目</button></div>
+        </div>
+        <div class="status" id="pp-status"></div>
+        <div class="out"><div class="md" id="pp-detail"></div></div>
+      </div>
+
+      <div class="card" id="pp-sec-card" style="display:none">
+        <h3 style="margin-top:0">章节草稿 / 审阅</h3>
+        <div class="row">
+          <div><label>章节 key</label><input id="pp-sec-key" placeholder="intro / method / exp1…"></div>
+          <div><label>章节名</label><input id="pp-sec-title" placeholder="Introduction"></div>
+          <div><label>指派</label><input id="pp-sec-assignee" placeholder="李四"></div>
+          <div><label>状态</label><select id="pp-sec-status"><option value="draft">草稿</option><option value="done">完成</option></select></div>
+        </div>
+        <label>内容（Markdown）</label>
+        <textarea id="pp-sec-content" placeholder="## 1.1 Background…"></textarea>
+        <button class="run" id="pp-sec-save">保存章节（同 key 覆盖并 +1 版本）</button>
+        <div class="row">
+          <div><label>写意见（节选 section key，* 表示全文）</label><input id="pp-cmt-section" placeholder="intro"></div>
+          <div><label>意见人</label><input id="pp-cmt-by" placeholder="导师"></div>
+        </div>
+        <textarea id="pp-cmt-text" placeholder="Introduction 的 contribution 要逐条列出、每条对应一个实验编号…"></textarea>
+        <button class="run ghost" id="pp-cmt-add" style="margin-top:10px">添加审阅意见</button>
+      </div>
+
+      <div class="card hidden" id="pp-collab-card">
+        <h3 style="margin-top:0">协作者 <span style="font-weight:400;color:var(--muted);font-size:12px">（仅创建者与管理员可管理；可编辑=能写章节与意见，仅查看=只读；被添加后项目自动收录进对方「我的论文」）</span></h3>
+        <div class="out" id="pp-collab-list"></div>
+        <div class="row">
+          <div><label>用户（来自用户目录）</label><select id="pp-collab-user"></select></div>
+          <div><label>权限</label>
+            <select id="pp-collab-perm"><option value="edit">可编辑</option><option value="view">仅查看</option></select></div>
+          <div><label>&nbsp;</label><button class="run" id="pp-collab-add" style="margin-top:0">添加协作者</button></div>
+        </div>
+        <span class="status" id="pp-collab-status"></span>
+      </div>
+    </section>
+
+    <!-- 实验复现 -->
+    <section data-pane="lab" class="hidden">
+      <div class="grid">
+        <div class="card">
+          <h3 style="margin-top:0">登记实验</h3>
+          <div class="row">
+            <div style="flex:2"><label>实验名称</label><input id="ex-name" placeholder="GNN-IDS 在 UAV-DS1 的 F1 评测"></div>
+            <div><label>数据集</label><input id="ex-dataset" placeholder="UAV-DS1"></div>
+          </div>
+          <div class="row">
+            <div><label>负责人（协作人）</label><select id="ex-owner"></select></div>
+            <div><label>状态</label>
+              <select id="ex-status"><option value="registered">已登记</option><option value="running">运行中</option><option value="done">已完成</option><option value="failed">失败</option></select>
+            </div>
+            <div><label>随机种子（逗号分隔）</label><input id="ex-seed" placeholder="42,2024"></div>
+          </div>
+          <label>假设（可空）</label>
+          <input id="ex-hyp" placeholder="图增强的可信监控层应显著降低拓扑抖动下的误报">
+          <button class="run" id="ex-add">登记</button>
+          <div class="status" id="ex-status-bar"></div>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">填结果 / 发起复现</h3>
+          <div class="row">
+            <div><label>实验</label><select id="ex-sel"></select></div>
+            <div><label>指标结果（JSON）</label><input id="ex-result" placeholder='{"F1": 0.921, "FAR": 0.03}'></div>
+          </div>
+          <button class="run" id="ex-save-result">保存结果</button>
+          <div class="row">
+            <div><label>复现人</label><input id="rp-by" placeholder="李四"></div>
+            <div><label>结论</label>
+              <select id="rp-result"><option value="running">复现中</option><option value="reproduced">一致</option><option value="partial">部分一致</option><option value="failed">不一致</option></select>
+            </div>
+            <div><label>环境（可空）</label><input id="rp-env" placeholder="PyTorch 2.1 / RTX 4090"></div>
+          </div>
+          <label>与原作者结论的差异说明</label>
+          <input id="rp-note" placeholder="F1 差 0.5 个百分点，怀疑来自批次顺序">
+          <button class="run ghost" id="rp-add">发起/更新复现</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="md" id="lab-tables"></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">实验结果 CSV 校验（数据验证/复现前检查）</h3>
+        <textarea id="v-csv">epochs,F1,FAR
+10,0.712,0.12
+20,0.803,0.09
+30,0.861,0.071
+40,abc,0.06</textarea>
+        <div class="row">
+          <button class="run" id="v-run">校验 CSV</button>
+          <span class="status" id="v-status"></span>
+        </div>
+        <div class="out hidden" id="v-out"><div class="md" id="v-md"></div></div>
+      </div>
+
+    </section>
+
+    <!-- 统计分析 -->
+    <section data-pane="stat" class="hidden">
+      <div class="card">
+        <h3 style="margin-top:0">统计分析 <span style="font-weight:400;color:var(--muted);font-size:12px">（描述统计 + Welch t 检验，纯本地计算；可附 AI 解读）</span></h3>
+        <label>数据（每行一组：组名: 数值1, 数值2, …）</label>
+        <textarea id="st-text" style="min-height:90px" placeholder="组A: 0.71, 0.68, 0.80, 0.75&#10;组B: 0.60, 0.55, 0.66, 0.58"></textarea>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="run" id="st-run">统计分析</button>
+          <label style="margin:10px 0 0;display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12.5px">
+            <input type="checkbox" id="st-ai" style="width:auto"> 附 AI 解读（需已配置模型）
+          </label>
+          <span class="status" id="st-status"></span>
+        </div>
+        <div class="out hidden" id="st-out"><div class="md" id="st-md"></div></div>
+      </div>
+
+    </section>
+
+    <!-- 算法与训练 -->
+    <section data-pane="algo" class="hidden">
+      <div class="card">
+        <h3 style="margin-top:0">训练集检索与下载 <span style="font-weight:400;color:var(--muted);font-size:12px">（导入论文/开题报告 → 提取数据集名 → Zenodo 公开 API 检索 → 服务端下载到本地；大文件提供链接手下）</span></h3>
+        <label>论文 / 开题报告文本（粘贴后提取数据集名）</label>
+        <textarea id="ds-text" style="min-height:70px" placeholder="粘贴含数据集信息的段落…"></textarea>
+        <div class="row">
+          <div style="flex:2"><label>数据集检索词（可手动修改）</label><input id="ds-query" placeholder="如 UAVIDS-2025 / network intrusion detection dataset"></div>
+          <div><label>&nbsp;</label><button class="run" id="ds-extract" style="margin-top:0">从文本提取</button></div>
+          <div><label>&nbsp;</label><button class="run" id="ds-search" style="margin-top:0">检索 Zenodo</button></div>
+        </div>
+        <div class="out" id="ds-hits"></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="run ghost" id="ds-mine-btn" style="margin-top:10px">查看已下载数据集</button>
+          <button class="run ghost" id="ds-to-tp" style="margin-top:10px">把数据集信息带入 AI 训练设计 ↓</button>
+          <span class="status" id="ds-status"></span>
+        </div>
+        <div class="out" id="ds-mine"></div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h3 style="margin-top:0">算法生成 <span style="font-weight:400;color:var(--muted);font-size:12px">（AI 生成训练脚本骨架 / 伪代码；未指定的设置以 # TODO(待补) 标注，不编造）</span></h3>
+          <div class="row">
+            <div><label>类型</label>
+              <select id="ag-kind">
+                <option value="train_script">PyTorch 训练脚本骨架</option>
+                <option value="pseudocode">论文式伪代码</option>
+              </select></div>
+          </div>
+          <label>方法描述（数据 / 模型 / 指标，越具体越好）</label>
+          <textarea id="ag-desc" style="min-height:90px" placeholder="如：UAVIDS-2025 五分类，LSTM，输入 41 维流量特征，Adam lr=1e-3，报 Macro-F1"></textarea>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button class="run" id="ag-gen">生成</button>
+            <button class="run ghost" id="ag-save">存草稿库</button>
+            <span class="status" id="ag-status"></span>
+          </div>
+          <div class="out hidden" id="ag-out"><div class="md" id="ag-md"></div></div>
+        </div>
+
+        <div class="card">
+          <h3 style="margin-top:0">算法校验 <span style="font-weight:400;color:var(--muted);font-size:12px">（本地静态检查：语法/训练循环/损失/优化器/保存/种子；可附 AI 复审）</span></h3>
+          <label>粘贴代码</label>
+          <textarea id="alc-code" style="min-height:120px" placeholder="粘贴 Python 代码…"></textarea>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button class="run" id="alc-run">静态校验</button>
+            <label style="margin:10px 0 0;display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12.5px">
+              <input type="checkbox" id="alc-ai" style="width:auto"> 附 AI 复审
+            </label>
+            <span class="status" id="alc-status"></span>
+          </div>
+          <div class="out hidden" id="alc-rout"><div class="md" id="alc-rmd"></div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">自动训练设计 <span style="font-weight:400;color:var(--muted);font-size:12px">（根据论文/方法描述生成完整训练方案 + 可运行脚本骨架，AI 驱动；可直接调用「我的论文」已导入的 Word）</span></h3>
+        <div class="row">
+          <div style="flex:2"><label>从「我的论文」载入已导入的 Word</label><select id="tp-paper"><option value="">— 选择论文条目 —</option></select></div>
+          <div><label>&nbsp;</label><button class="run ghost" id="tp-loadpaper" style="margin-top:0">载入论文文本</button></div>
+          <div><label>&nbsp;</label><input type="file" id="tp-file" accept=".docx" style="max-width:200px"><label>&nbsp;</label><button class="run ghost" id="tp-upload" style="margin-top:0">上传并载入</button></div>
+        </div>
+        <label>论文文本或方法描述</label>
+        <textarea id="tp-text" style="min-height:120px" placeholder="粘贴论文方法部分或描述你的模型/数据/评估协议…"></textarea>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="run" id="tp-run">生成训练方案</button>
+          <button class="run ghost" id="tp-save">存草稿库</button>
+          <span class="status" id="tp-status"></span>
+        </div>
+        <div class="out hidden" id="tp-out"><div class="md" id="tp-md"></div></div>
+      </div>
+    </section>
+
+    <!-- 设置 -->
+    <section data-pane="settings" class="hidden">
+      <div class="card">
+        <h3 style="margin-top:0">模型设置 <span style="font-weight:400;color:var(--muted);font-size:12px">（AI 判断 / AI 问答 / AI 诊断的前提，保存一次即可；为全局设置，仅管理员可改）</span></h3>
+        <div class="row">
+          <div>
+            <label>预设（默认腾讯混元，免费额度）</label>
+            <select id="ms-preset">
+              <option value="hunyuan">腾讯混元（默认 · 免费额度）</option>
+              <option value="deepseek">DeepSeek</option>
+              <option value="ollama">本地 Ollama</option>
+              <option value="custom">自定义 OpenAI 兼容</option>
+            </select>
+          </div>
+          <div>
+            <label>后端类型</label>
+            <select id="ms-backend">
+              <option value="auto">auto（自动）</option>
+              <option value="openai">openai 兼容 API</option>
+              <option value="ollama">ollama 本地</option>
+              <option value="none">none（禁用）</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div style="flex:2"><label>Base URL（OpenAI 兼容端点，切预设会自动填好）</label>
+            <input id="ms-url" placeholder="https://api.hunyuan.cloud.tencent.com/v1"></div>
+        </div>
+        <div class="row">
+          <div><label>API Key（本地网关可留空）</label><input id="ms-key" type="password" placeholder="sk-…"></div>
+          <div><label>模型名</label><input id="ms-model" placeholder="hunyuan-turbos-latest"></div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="run" id="ms-save" style="margin-top:10px">保存配置</button>
+          <button class="run ghost" id="ms-test" style="margin-top:10px">测试连接</button>
+          <span class="status" id="ms-state"></span>
+        </div>
+        <div class="status" id="ms-status"></div>
+        <p style="color:var(--muted);font-size:12px;margin:10px 0 0">默认即腾讯混元（OpenAI 兼容端点，需自备 API Key，新用户通常有免费额度）。切预设会自动填好 Base URL 与模型名，你只补 API Key。对话框会默认走这个模型。若你持有其它平台的 OpenAI 兼容额度（DeepSeek/Kimi/GLM/中转等），选「自定义 OpenAI 兼容」填入端点+Key 即可。隐私：选远端 API 会把问题（含画像）发到该服务；本地 Ollama 数据不出本机。</p>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">个人信息 <span style="font-weight:400;color:var(--muted);font-size:12px">（常规信息：显示名 / 邮箱 / 修改自己的密码）</span></h3>
+        <div class="row">
+          <div><label>用户名</label><input id="pi-name" disabled></div>
+          <div><label>显示名</label><input id="pi-display" placeholder="登录后展示的名字"></div>
+          <div><label>邮箱</label><input id="pi-email" placeholder="选填"></div>
+        </div>
+        <button class="run" id="pi-save">保存个人信息</button>
+        <span class="status" id="pi-status"></span>
+        <div class="row" style="margin-top:8px">
+          <div><label>旧密码</label><input id="pi-old" type="password" placeholder="修改密码需验证"></div>
+          <div><label>新密码（≥6 位）</label><input id="pi-new" type="password"></div>
+          <div><label>&nbsp;</label><button class="run ghost" id="pi-pwd" style="margin-top:0">修改密码</button></div>
+        </div>
+        <span class="status" id="pi-pwd-status"></span>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">API 信息识别 <span style="font-weight:400;color:var(--muted);font-size:12px">（把服务商给的 API 信息整段粘贴到下面，自动识别 端点 / Key / 模型名 并填入上方「模型设置」）</span></h3>
+        <textarea id="api-paste" style="min-height:90px" placeholder="支持多种写法，例如：&#10;接口地址：https://api.xxx.com/v1&#10;API Key：sk-xxxxxxxxxxxxxxxx&#10;模型：deepseek-chat&#10;&#10;或直接粘贴整段开通邮件 / 文档说明。"></textarea>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="run" id="api-parse">识别并填入模型设置</button>
+          <span class="status" id="api-parse-status"></span>
+        </div>
+        <p style="color:var(--muted);font-size:12px;margin:8px 0 0">识别规则：端点（http(s) 链接，优先含 /v1）、Key（sk- 开头或 key/密钥/令牌 后的字符串）、模型名（model/模型 后的字符串，或已知模型名）。识别后请核对上方「模型设置」再点「保存配置」。</p>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">技能管理 <span style="font-weight:400;color:var(--muted);font-size:12px">（选中技能用于删除与导出，可 Ctrl/Shift 多选；技能的运行在各功能模块内）</span></h3>
+        <div class="row">
+          <div style="flex:2"><label>技能列表（内置 + 自定义）</label>
+            <select id="sk-multi" multiple style="min-height:120px"></select></div>
+          <div style="flex:1">
+            <label>&nbsp;</label>
+            <button class="run ghost" id="sk-refresh" style="margin-top:0;width:100%">刷新技能</button>
+            <button class="run ghost danger" id="sk-del" style="margin-top:8px;width:100%">删除所选自定义技能</button>
+            <span class="status" id="sk-status"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">导入自定义技能 <span style="font-weight:400;color:var(--muted);font-size:12px">（.zip 自动解压注册包内技能 / .md/.txt 正文即提示词 / .json：{name,desc,prompt}）</span></h3>
+        <div class="row">
+          <div><label>技能文件</label>
+            <input type="file" id="sk-file" accept=".zip,.md,.txt,.json"></div>
+          <div style="flex:1"><label>技能名称（上传 .md/.txt 时用，可留空）</label><input id="sk-name" placeholder="可选"></div>
+        </div>
+        <span class="status" id="sk-up-status"></span>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">导出技能 <span style="font-weight:400;color:var(--muted);font-size:12px">（在「技能管理」列表中选中要导出的技能，可多选，导出为 .zip 分享或备份）</span></h3>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="run" id="sk-export">导出所选技能（.zip）</button>
+          <span class="status" id="sk-exp-status"></span>
+        </div>
+      </div>
+
+
+    </section>
+
+    <!-- 账户管理（仅管理员；从设置中独立为顶层功能点） -->
+    <section data-pane="accounts" class="hidden">
+      <div class="card">
+        <h3 style="margin-top:0">账户管理 <span style="font-weight:400;color:var(--muted);font-size:12px">（仅管理员可见的顶层功能点；admin 不可降级/停用/删除）</span></h3>
+        <p style="color:var(--muted);margin-top:0">侧栏「注册」对所有人开放；账户的角色、启用/停用、改密、删除由管理员在此管理。</p>
+        <div class="row">
+          <div><label>新建用户名（≥2 字符）</label><input id="ac-name" placeholder="newuser"></div>
+          <div><label>初始密码（≥6 位）</label><input id="ac-pwd" type="password" placeholder="请设置初始密码"></div>
+          <div><label>显示名</label><input id="ac-display" placeholder="可选"></div>
+        </div>
+        <button class="run" id="ac-add" style="margin-top:10px">创建账户</button>
+        <div class="status" id="ac-status"></div>
+        <div class="out" id="acct-box" style="margin-top:12px"></div>
+      </div>
+    </section>
+
+    <!-- 文献库（参考文献文件夹） -->
+    <section data-pane="reflib" class="hidden">
+      <div class="card">
+        <h3 style="margin-top:0">文献库 <span style="font-weight:400;color:var(--muted);font-size:12px">（收录「文献检索」的真实结果——AI 永不生成文献条目；支持检索/批量精读/综合创新点）</span></h3>
+        <div class="row">
+          <div style="flex:2"><label>新建参考文献文件夹</label><input id="rf-name" placeholder="如：可信 IDS 综述 · 核心 20 篇"></div>
+          <div><label>&nbsp;</label><button class="run" id="rf-create" style="margin-top:0">创建</button></div>
+          <div><label>&nbsp;</label><button class="run ghost" id="rf-refresh" style="margin-top:0">刷新</button></div>
+        </div>
+        <div class="row">
+          <div style="flex:2"><label>选择文件夹</label><select id="rf-sel"></select></div>
+          <div><label>&nbsp;</label><button class="run ghost danger" id="rf-del" style="margin-top:0">删除该文件夹</button></div>
+        </div>
+        <div class="row">
+          <div style="flex:2"><label>库内检索（按标题/年份过滤）</label><input id="rf-filter" placeholder="输入关键词即时过滤"></div>
+          <div><label>精读维度（勾选，可多选）</label>
+            <div id="rf-kind" style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px">
+              <label style="display:flex;align-items:center;gap:5px;margin:0;color:var(--text);font-size:13px"><input type="checkbox" value="tech" checked style="width:auto"> 技术点分析</label>
+              <label style="display:flex;align-items:center;gap:5px;margin:0;color:var(--text);font-size:13px"><input type="checkbox" value="innovation" checked style="width:auto"> 创新点总结</label>
+              <label style="display:flex;align-items:center;gap:5px;margin:0;color:var(--text);font-size:13px"><input type="checkbox" value="gap" style="width:auto"> 空白研究分析</label>
+            </div></div>
+          <div><label>&nbsp;</label><button class="run" id="rf-digest" style="margin-top:0">批量生成精读分析</button></div>
+        </div>
+        <span class="status" id="rf-status"></span>
+        <div class="out" id="rf-papers"></div>
+      </div>
+      <div class="card hidden" id="rf-ana-card">
+        <h3 style="margin-top:0">精读分析表 <span style="font-weight:400;color:var(--muted);font-size:12px">（每行一篇；点击行展开分析全文；表格可服务于找创新点与可行性）</span></h3>
+        <div class="out" id="rf-ana"></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="run" id="rf-syn">综合分析：找创新点 + 可行性评估</button>
+          <button class="run ghost" id="rf-review">将综合结论送入盲审 →</button>
+          <span class="status" id="rf-syn-status"></span>
+        </div>
+        <div class="out hidden" id="rf-syn-out"><div class="md" id="rf-syn-md"></div></div>
+      </div>
+    </section>
+
+    <!-- 评审工作台（AI 专家盲审 + 协作者审核） -->
+    <section data-pane="reviewhub" class="hidden">
+      <div class="card">
+        <h3 style="margin-top:0">发起评审 <span style="font-weight:400;color:var(--muted);font-size:12px">（AI 专家盲审：三位匿名专家独立评审，材料自动去标识化；协作者审核：指定合作者评分）</span></h3>
+        <div class="row">
+          <div><label>类型</label>
+            <select id="vh-kind"><option value="ai_blind">AI 专家盲审</option><option value="peer">协作者审核</option></select></div>
+          <div style="flex:2"><label>评审标题</label><input id="vh-title" placeholder="如：三层信任框架 · 方法论部分"></div>
+        </div>
+        <label>评审材料（粘贴方向结论 / 创新点 / 方法论 / 论文段落）</label>
+        <textarea id="vh-content" style="min-height:110px" placeholder="粘贴需要被评审的内容…"></textarea>
+        <div id="vh-peer-row" class="row" style="display:none">
+          <div style="flex:2"><label>评审人（我的合作者，可多选）</label><select id="vh-reviewers" multiple style="min-height:60px"></select></div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="run" id="vh-create">发起评审</button>
+          <span class="status" id="vh-status"></span>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">我的评审</h3>
+        <button class="run ghost" id="vh-refresh" style="margin-top:0">刷新</button>
+        <div class="out" id="vh-list"></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">待我审核 <span style="font-weight:400;color:var(--muted);font-size:12px">（协作者发给你的评审任务）</span></h3>
+        <button class="run ghost" id="vh-mine-refresh" style="margin-top:0">刷新</button>
+        <div class="out" id="vh-mine"></div>
+        <div class="hidden" id="vh-submit-card">
+          <label>评分（1-5）与结论</label>
+          <div class="row">
+            <div><label>创新性</label><input id="sc-a" type="number" min="1" max="5" value="3"></div>
+            <div><label>严谨性</label><input id="sc-b" type="number" min="1" max="5" value="3"></div>
+            <div><label>可行性</label><input id="sc-c" type="number" min="1" max="5" value="3"></div>
+            <div><label>清晰度</label><input id="sc-d" type="number" min="1" max="5" value="3"></div>
+            <div><label>结论</label>
+              <select id="vh-verdict"><option>Minor Revision</option><option>Major Revision</option><option>Accept</option><option>Reject</option></select></div>
+          </div>
+          <label>评审意见</label>
+          <textarea id="vh-comments" style="min-height:80px" placeholder="主要优点 / 主要问题 / 必须补的实验…"></textarea>
+          <button class="run" id="vh-submit">提交我的评审</button>
+          <span class="status" id="vh-submit-status"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 写作综述 -->
+    <section data-pane="write" class="hidden">
+      <div class="card">
+        <h3 style="margin-top:0">AI 写作助手 <span style="font-weight:400;color:var(--muted);font-size:12px">（大纲/初稿/润色/投稿信/审稿回复；不编造文献与数据，缺失处一律【待补】占位）</span></h3>
+        <div class="row">
+          <div><label>任务类型</label>
+            <select id="wr-kind">
+              <option value="outline">论文大纲</option>
+              <option value="draft">章节初稿</option>
+              <option value="polish">学术润色</option>
+              <option value="cover">投稿信 Cover Letter</option>
+              <option value="response">审稿回复</option>
+            </select></div>
+          <div style="flex:2"><label>主题 / 章节名</label><input id="wr-topic" placeholder="如：Graph-Augmented Trust Framework 方法章节"></div>
+        </div>
+        <label>要点（每行一条；大纲/初稿/投稿信用）</label>
+        <textarea id="wr-points" style="min-height:80px" placeholder="创新点 / 素材 / 目标篇幅…"></textarea>
+        <label>素材 / 原文（润色、审稿回复粘贴在这里）</label>
+        <textarea id="wr-extra" style="min-height:80px" placeholder="待润色段落，或审稿意见原文…"></textarea>
+        <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:8px">
+          <label style="display:flex;align-items:center;gap:5px;margin:0;color:var(--text);font-size:13px"><input type="checkbox" id="wr-sk-cs" style="width:auto"> CS/AI 分学科写作检查</label>
+          <label style="display:flex;align-items:center;gap:5px;margin:0;color:var(--text);font-size:13px"><input type="checkbox" id="wr-sk-slides" style="width:auto"> 生成 HTML 汇报幻灯</label>
+          <button class="run ghost" id="wr-skill-run" style="margin-top:0">运行勾选的技能</button>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="run" id="wr-gen">生成</button>
+          <button class="run ghost" id="wr-save">保存到草稿库</button>
+          <span class="status" id="wr-status"></span>
+        </div>
+        <div class="out hidden" id="wr-out"><div class="md" id="wr-md"></div></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">文献综述工作台 <span style="font-weight:400;color:var(--muted);font-size:12px">（基于最近一次检索结果，或粘贴检索 JSON）</span></h3>
+        <div class="row">
+          <div style="flex:2"><label>综述主题</label><input id="rv-topic" placeholder="如：UAV 自组网中的可信入侵检测"></div>
+          <div><label>综述角度</label>
+            <select id="rv-angle">
+              <option value="gap">研究空白（批判性）</option>
+              <option value="timeline">发展脉络</option>
+              <option value="methods">方法对比</option>
+              <option value="app">应用与场景</option>
+            </select></div>
+        </div>
+        <label>补充文献 JSON（可选；留空则用「文献检索」的最近结果）</label>
+        <textarea id="rv-json" style="min-height:70px" placeholder='{"records":[…]}，留空则用最近检索结果'></textarea>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="run" id="rv-gen">生成综述初稿</button>
+          <button class="run ghost" id="rv-save">存档综述</button>
+          <span class="status" id="rv-status"></span>
+        </div>
+        <div class="out hidden" id="rv-out"><div class="md" id="rv-md"></div></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">开题报告 → 论文初稿 <span style="font-weight:400;color:var(--muted);font-size:12px">（AI 流水线：大纲 → 逐节撰写 → 摘要；只依据开题报告，实验数据以【TBD】占位）</span></h3>
+        <div class="row">
+          <div style="flex:2"><label>论文标题（留空则由 AI 拟定）</label><input id="ap-title" placeholder="可选"></div>
+          <div><label>目标期刊 / 会议</label><input id="ap-journal" placeholder="如：IEEE Access"></div>
+          <div><label>语言</label>
+            <select id="ap-lang"><option value="en">English</option><option value="zh">中文</option></select></div>
+        </div>
+        <label>开题报告全文（粘贴文本，≥200 字符）</label>
+        <textarea id="ap-text" style="min-height:140px" placeholder="粘贴开题报告：背景/文献/研究内容/方法/实验设计/创新点…"></textarea>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="run" id="ap-run">开始自动成文</button>
+          <button class="run ghost" id="ap-save" disabled>存草稿库</button>
+          <span class="status" id="ap-status"></span>
+        </div>
+        <div class="out hidden" id="ap-out"><div class="md" id="ap-md"></div></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">草稿库 <span style="font-weight:400;color:var(--muted);font-size:12px">（写作草稿 + 综述存档）</span></h3>
+        <div style="display:flex;gap:10px"><button class="run ghost" id="wr-refresh" style="margin-top:0">刷新</button></div>
+        <div class="out" id="wr-docs"></div>
+        <div class="out" id="rv-list"></div>
+      </div>
+    </section>
+
+    <!-- 我的论文 -->
+    <section data-pane="mypaper" class="hidden">
+      <div class="card">
+        <h3 style="margin-top:0">我的论文 <span style="font-weight:400;color:var(--muted);font-size:12px">（个人论文台账，仅本人可见；与他人合写请用「协作中心」）</span></h3>
+        <div class="row">
+          <div style="flex:2"><label>论文标题</label><input id="mp-title" placeholder="如：Explainable Decision-Credibility Monitoring for IDS in UAV Ad Hoc Networks"></div>
+          <div><label>类型</label>
+            <select id="mp-type">
+              <option>期刊论文</option>
+              <option>会议论文</option>
+              <option>学位论文</option>
+              <option>其他</option>
+            </select></div>
+        </div>
+        <div class="row">
+          <div><label>目标期刊 / 会议</label><input id="mp-journal" placeholder="如：IEEE T-ITS"></div>
+          <div><label>截止日期</label><input id="mp-deadline" type="date"></div>
+          <div><label>状态</label>
+            <select id="mp-status">
+              <option value="planning">规划中</option>
+              <option value="writing" selected>撰写中</option>
+              <option value="submitted">已投稿</option>
+              <option value="review">评审中</option>
+              <option value="revision">修回中</option>
+              <option value="accepted">已录用</option>
+              <option value="rejected">已拒</option>
+            </select></div>
+        </div>
+        <label>备注（创新点/进度提醒，可选）</label>
+        <input id="mp-notes" placeholder="如：N1–N5 对应框架五模块，先补实验">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="run" id="mp-add">添加论文</button>
+          <button class="run ghost" id="mp-refresh">刷新</button>
+          <input type="file" id="mp-file" accept=".docx" style="max-width:220px">
+          <button class="run ghost" id="mp-import">导入 Word 自动建档</button>
+          <span class="status" id="mp-status-box"></span>
+        </div>
+        <div class="out" id="mp-list"></div>
+        <h3 style="margin:14px 0 4px;font-size:13.5px">参与的合作论文 <span style="font-weight:400;color:var(--muted);font-size:12px">（被创建者加为协作者后自动收录；权限由创建者授予）</span></h3>
+        <div class="out" id="mp-shared"></div>
+      </div>
+    </section>
+
+    <!-- 论文引导（小白流程） -->
+    <section data-pane="guide" class="hidden">
+      <div class="card">
+        <h3 style="margin-top:0">论文引导 · 十步走 <span style="font-weight:400;color:var(--muted);font-size:12px">（第一次写论文？按流程图一步步来；点任意节点查看引导，完成后打勾，进度自动保存）</span></h3>
+        <div class="g-flow" id="gd-flow"></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px">
+          <span class="status" id="gd-progress"></span>
+          <button class="run ghost" id="gd-reset" style="margin-top:0">重置全部进度</button>
+        </div>
+      </div>
+      <div class="card hidden" id="gd-detail-card">
+        <h3 style="margin-top:0" id="gd-detail-title"></h3>
+        <div class="md" id="gd-detail"></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="run" id="gd-goto">去完成 →</button>
+          <button class="run ghost" id="gd-done">标记这一步完成</button>
+          <span class="status" id="gd-status"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 论文精读 -->
+    <section data-pane="digest" class="hidden">
+      <div class="card">
+        <h3 style="margin-top:0">论文精读 <span style="font-weight:400;color:var(--muted);font-size:12px">（粘贴论文全文/章节/摘要，AI 只依据文本分析，不引入外部文献；需已配置模型）</span></h3>
+        <label>论文文本（≥100 字，最长约 1.2 万字，超出自动截断）</label>
+        <textarea id="dg-text" style="min-height:160px" placeholder="粘贴论文摘要、某一章节或全文…"></textarea>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="run" data-dg="tech">技术点分析</button>
+          <button class="run" data-dg="innovation">创新点总结</button>
+          <button class="run" data-dg="feasibility">可行性分析</button>
+          <button class="run" data-dg="gap">空白研究分析</button>
+          <button class="run ghost" data-dg="translate">翻译（中⇄英自动）</button>
+          <span class="status" id="dg-status"></span>
+        </div>
+        <div class="out hidden" id="dg-out">
+          <div style="display:flex;justify-content:flex-end;gap:8px">
+            <button class="btn-mini" id="dg-copy">复制结果</button>
+          </div>
+          <div class="md" id="dg-md"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 长期记忆 -->
+    <section data-pane="memory" class="hidden">      <div class="card">
+        <h3 style="margin-top:0">长期记忆 <span style="font-weight:400;color:var(--muted);font-size:12px">（只属于当前登录账户；「智能对话」AI 问答自动带上）</span></h3>
+        <div class="row">
+          <div><label>类型</label>
+            <select id="mm-kind">
+              <option value="note">备忘</option>
+              <option value="knowledge">知识</option>
+              <option value="experience">经验/踩坑</option>
+              <option value="rule">约定/规矩</option>
+            </select></div>
+          <div style="flex:3"><label>内容（≤600 字）</label><input id="mm-text" placeholder="如：实验一律先跑 3 个随机种子再报均值"></div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="run" id="mm-add">添加记忆</button>
+          <button class="run ghost" id="mm-refresh">刷新</button>
+          <span class="status" id="mm-status"></span>
+        </div>
+        <p style="color:var(--muted);font-size:12px;margin:8px 0 0">也可以在对话框直接说「记住：……」「查看记忆」「删除记忆 &lt;关键词&gt;」。每人最多保留最近 60 条。</p>
+        <div class="out" id="mm-list"></div>
+      </div>
+    </section>
+  </main>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

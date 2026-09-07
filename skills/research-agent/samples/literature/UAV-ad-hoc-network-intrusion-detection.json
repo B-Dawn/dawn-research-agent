@@ -1,0 +1,283 @@
+{
+  "query": "UAV ad hoc network intrusion detection",
+  "sources": [
+    "arxiv",
+    "crossref",
+    "openalex"
+  ],
+  "year_from": 2023,
+  "year_to": null,
+  "retrieved_at": "2026-09-06 14:32:55",
+  "count": 16,
+  "records": [
+    {
+      "title": "A Comprehensive Review of Recent Research Trends on Unmanned Aerial Vehicles (UAVs)",
+      "authors": [
+        "Khaled Telli",
+        "Okba Kraa",
+        "Yassine Himeur",
+        "Abdelmalik Ouamane",
+        "Mohamed Boumehraz",
+        "Shadi Atalla",
+        "Wathiq Mansoor"
+      ],
+      "year": 2023,
+      "venue": "Systems",
+      "doi": "10.3390/systems11080400",
+      "url": "https://doi.org/10.3390/systems11080400",
+      "abstract": "The growing interest in unmanned aerial vehicles (UAVs) from both the scientific and industrial sectors has attracted a wave of new researchers and substantial investments in this expansive field. However, due to the wide range of topics and subdomains within UAV research, newcomers may find themselves overwhelmed by the numerous options available. It is therefore crucial for those involved in UAV research to recognize its interdisciplinary nature and its connections with other disciplines. This paper presents a comprehensive overview of the UAV field, highlighting recent trends and advancements. Drawing on recent literature reviews and surveys, the review begins by classifying UAVs based on their flight characteristics. It then provides an overview of current research trends in UAVs, utilizing data from the Scopus database to quantify the number of scientific documents associated with each research direction and their interconnections. This paper also explores potential areas for further development in UAVs, including communication, artificial intelligence, remote sensing, miniaturization, swarming and cooperative control, and transformability. Additionally, it discusses the development of aircraft control, commonly used control techniques, and appropriate control algorithms in UAV research. Furthermore, this paper addresses the general hardware and software architecture of UAVs, their applications, and the key issues associated with them. It also provides an overview of current open source software and hardware projects in the UAV field. By presenting a comprehensive view of the UAV field, this paper aims to enhance our understanding of this rapidly evolving and highly interdisciplinary area of research.",
+      "citations": 325,
+      "source": "OpenAlex"
+    },
+    {
+      "title": "AI for UAV-Assisted IoT Applications: A Comprehensive Review",
+      "authors": [
+        "Nan Cheng",
+        "Shen Wu",
+        "Xiucheng Wang",
+        "Zhisheng Yin",
+        "Changle Li",
+        "Wen Chen",
+        "Fangjiong Chen"
+      ],
+      "year": 2023,
+      "venue": "IEEE Internet of Things Journal",
+      "doi": "10.1109/jiot.2023.3268316",
+      "url": "https://doi.org/10.1109/jiot.2023.3268316",
+      "abstract": "With the rapid development of the Internet of Things (IoT), there are a dramatically increasing number of devices, leading to the fact that only using terrestrial infrastructure can hardly provide high-quality services to all devices. Due to their flexibility, maneuverability, and economy, unmanned aerial vehicles (UAVs) are widely used to improve the performance of IoT networks. UAVs can not only provide wireless access to IoT devices in the absence of a terrestrial network but can also perform rich IoT services and applications such as video surveillance, cargo transportation, pesticide spraying, and so forth. However, due to the high complexity, dynamics, and heterogeneity of the UAV-assisted IoT networks, growing attention has focused on using artificial intelligence (AI)-based methods to optimize, schedule, and orchestrate UAV-assisted IoT networks. In this article, we comprehensively analyze the impact of applying advanced AI architectures, models, and methods to different aspects of UAV-assisted IoT networks, including key IoT technologies, tasks, and applications. In addition, this article also explores challenges and discusses potential research directions of AI-enabled UAV-assisted IoT networks.",
+      "citations": 288,
+      "source": "OpenAlex"
+    },
+    {
+      "title": "A survey on security and privacy issues of UAVs",
+      "authors": [
+        "Yassine Mekdad",
+        "Ahmet Arış",
+        "Leonardo Babun",
+        "Abdeslam El Fergougui",
+        "Mauro Conti",
+        "Riccardo Lazzeretti",
+        "A. Selcuk Uluagac"
+      ],
+      "year": 2023,
+      "venue": "Computer Networks",
+      "doi": "10.1016/j.comnet.2023.109626",
+      "url": "https://doi.org/10.1016/j.comnet.2023.109626",
+      "abstract": "",
+      "citations": 237,
+      "source": "OpenAlex"
+    },
+    {
+      "title": "A Novel Two-Stage Deep Learning Model for Network Intrusion Detection: LSTM-AE",
+      "authors": [
+        "Vanlalruata Hnamte",
+        "Hong Nhung Nguyen",
+        "Jamal Hussain",
+        "Yong‐Hwa Kim"
+      ],
+      "year": 2023,
+      "venue": "IEEE Access",
+      "doi": "10.1109/access.2023.3266979",
+      "url": "https://doi.org/10.1109/access.2023.3266979",
+      "abstract": "Machine learning and deep learning techniques are widely used to assess intrusion detection systems (IDS) capable of rapidly and automatically recognizing and classifying cyber-attacks on networks and hosts. However, when destructive attacks are becoming more extensive, more challenges develop, needing a comprehensive response. Numerous intrusion detection datasets are publicly accessible for further analysis by the cybersecurity research community. However, no previous research has examined the performance of the proposed model on a variety of publicly accessible datasets in detail. Due to the dynamic nature of the attack and its rapidly changing attack techniques, the publicly accessible intrusion datasets must be updated and benchmarked regularly. The deep neural network (DNN) and convolutional neural network (CNN) are examined in this article as types of deep learning models for developing a flexible and effective IDS capable of detecting and comparing them with the proposed model in detecting cyber-attacks. The constant development of network behavior and the fast growth of attacks need the development of IDS and the evaluation of many datasets produced over time through static and dynamic methods. This kind of research enables the identification of the most efficient algorithm for identifying future cyber-attacks. We proposed a novel two-stage deep learning technique hybridizing Long-Short Term Memory (LSTM) and Auto-Encoders (AE) for detecting attacks. The CICIDS2017 and CSE-CICDIS2018 datasets are used to determine the optimum network parameters for the proposed LSTM-AE. The experimental results show that the proposed hybrid model works well and is applicable for detecting attacks in modern scenarios.",
+      "citations": 192,
+      "source": "OpenAlex"
+    },
+    {
+      "title": "Explainable Artificial Intelligence (XAI) for Intrusion Detection and Mitigation in Intelligent Connected Vehicles: A Review",
+      "authors": [
+        "Cosmas Ifeanyi Nwakanma",
+        "Love Allen Chijioke Ahakonye",
+        "Judith Nkechinyere Njoku",
+        "J. C. Odirichukwu",
+        "Stanley Adiele Okolie",
+        "Chinebuli Uzondu",
+        "Christiana Chidimma Ndubuisi Nweke",
+        "Dong‐Seong Kim"
+      ],
+      "year": 2023,
+      "venue": "Applied Sciences",
+      "doi": "10.3390/app13031252",
+      "url": "https://doi.org/10.3390/app13031252",
+      "abstract": "The potential for an intelligent transportation system (ITS) has been made possible by the growth of the Internet of things (IoT) and artificial intelligence (AI), resulting in the integration of IoT and ITS—known as the Internet of vehicles (IoV). To achieve the goal of automatic driving and efficient mobility, IoV is now combined with modern communication technologies (such as 5G) to achieve intelligent connected vehicles (ICVs). However, IoV is challenged with security risks in the following five (5) domains: ICV security, intelligent device security, service platform security, V2X communication security, and data security. Numerous AI models have been developed to mitigate the impact of intrusion threats on ICVs. On the other hand, the rise in explainable AI (XAI) results from the requirement to inject confidence, transparency, and repeatability into the development of AI for the security of ICV and to provide a safe ITS. As a result, the scope of this review covered the XAI models used in ICV intrusion detection systems (IDSs), their taxonomies, and outstanding research problems. The results of the study show that XAI though in its infancy of application to ICV, is a promising research direction in the quest for improving the network efficiency of ICVs. The paper further reveals that XAI increased transparency will foster its acceptability in the automobile industry.",
+      "citations": 188,
+      "source": "OpenAlex"
+    },
+    {
+      "title": "Detection of Real-Time Malicious Intrusions and Attacks in IoT Empowered Cybersecurity Infrastructures",
+      "authors": [
+        "Irfan Ali Kandhro",
+        "Sultan M. Alanazi",
+        "Fayyaz Ali",
+        "Asadullah Kehar",
+        "Kanwal Fatima",
+        "Mueen Uddin",
+        "Shankar Karuppayah"
+      ],
+      "year": 2023,
+      "venue": "IEEE Access",
+      "doi": "10.1109/access.2023.3238664",
+      "url": "https://doi.org/10.1109/access.2023.3238664",
+      "abstract": "Computer viruses, malicious, and other hostile attacks can affect a computer network. Intrusion detection is a key component of network security as an active defence technology. Traditional intrusion detection systems struggle with issues like poor accuracy, ineffective detection, a high percentage of false positives, and an inability to handle new types of intrusions. To address these issues, we propose a deep learning-based novel method to detect cybersecurity vulnerabilities and breaches in cyber-physical systems. The proposed framework contrasts the unsupervised and deep learning-based discriminative approaches. This paper presents a generative adversarial network to detect cyber threats in IoT-driven IICs networks. The results demonstrate a performance increase of approximately 95% to 97% in terms of accuracy, reliability, and efficiency in detecting all types of attacks with a dropout value of 0.2 and an epoch value of 25. The output of well-known state-of-the-art DL classifiers achieved the highest true rate (TNR) and highest detection rate (HDR) when detecting the following attacks: (BruteForceXXS, BruteForceWEB, DoS_Hulk_Attack, and DOS_LOIC_HTTP_Attack) on the NSL-KDD, KDDCup99, and UNSW-NB15 datasets. It also maintained the confidentiality and integrity of users’ and systems’ sensitive information during the training and testing phases.",
+      "citations": 133,
+      "source": "OpenAlex"
+    },
+    {
+      "title": "Deep Learning in the Fast Lane: A Survey on Advanced Intrusion Detection Systems for Intelligent Vehicle Networks",
+      "authors": [
+        "Mohammed Almehdhar",
+        "Abdullatif Albaseer",
+        "Muhammad Asif Khan",
+        "Mohamed Abdallah",
+        "Hamid Menouar",
+        "Saif Al‐Kuwari",
+        "Ala Al‐Fuqaha"
+      ],
+      "year": 2024,
+      "venue": "IEEE Open Journal of Vehicular Technology",
+      "doi": "10.1109/ojvt.2024.3422253",
+      "url": "https://doi.org/10.1109/ojvt.2024.3422253",
+      "abstract": "The rapid evolution of modern automobiles into intelligent and interconnected entities presents new challenges in cybersecurity, particularly in Intrusion Detection Systems (IDS) for In-Vehicle Networks (IVNs). This survey paper offers an in-depth examination of advanced machine learning (ML) and deep learning (DL) approaches employed in developing sophisticated IDS for safeguarding IVNs against potential cyber-attacks. Specifically, we focus on the Controller Area Network (CAN) protocol, which is prevalent in in-vehicle communication systems, yet exhibits inherent security vulnerabilities. We propose a novel taxonomy categorizing IDS techniques into conventional ML, DL, and hybrid models, highlighting their applicability in detecting and mitigating various cyber threats, including spoofing, eavesdropping, and denial-of-service attacks. We highlight the transition from traditional signature-based to anomaly-based detection methods, emphasizing the significant advantages of AI-driven approaches in identifying novel and sophisticated intrusions. Our systematic review covers a range of AI algorithms, including traditional ML, and advanced neural network models, such as Transformers, illustrating their effectiveness in IDS applications within IVNs. Additionally, we explore emerging technologies, such as Federated Learning (FL) and Transfer Learning, to enhance the robustness and adaptability of IDS solutions. Based on our thorough analysis, we identify key limitations in current methodologies and propose potential paths for future research, focusing on integrating real-time data analysis, cross-layer security measures, and collaborative IDS frameworks.",
+      "citations": 124,
+      "source": "OpenAlex"
+    },
+    {
+      "title": "An Adaptive Real-Time Malicious Node Detection Framework Using Machine Learning in Vehicular Ad-Hoc Networks (VANETs)",
+      "authors": [
+        "Kanwal Rashid",
+        "Yousaf Saeed",
+        "Abid Ali",
+        "Faisal Jamil",
+        "Reem Alkanhel",
+        "Ammar Muthanna"
+      ],
+      "year": 2023,
+      "venue": "Sensors",
+      "doi": "10.3390/s23052594",
+      "url": "https://doi.org/10.3390/s23052594",
+      "abstract": "Modern vehicle communication development is a continuous process in which cutting-edge security systems are required. Security is a main problem in the Vehicular Ad Hoc Network (VANET). Malicious node detection is one of the critical issues found in the VANET environment, with the ability to communicate and enhance the mechanism to enlarge the field. The vehicles are attacked by malicious nodes, especially DDoS attack detection. Several solutions are presented to overcome the issue, but none are solved in a real-time scenario using machine learning. During DDoS attacks, multiple vehicles are used in the attack as a flood on the targeted vehicle, so communication packets are not received, and replies to requests do not correspond in this regard. In this research, we selected the problem of malicious node detection and proposed a real-time malicious node detection system using machine learning. We proposed a distributed multi-layer classifier and evaluated the results using OMNET++ and SUMO with machine learning classification using GBT, LR, MLPC, RF, and SVM models. The group of normal vehicles and attacking vehicles dataset is considered to apply the proposed model. The simulation results effectively enhance the attack classification with an accuracy of 99%. Under LR and SVM, the system achieved 94 and 97%, respectively. The RF and GBT achieved better performance with 98% and 97% accuracy values, respectively. Since we have adopted Amazon Web Services, the network's performance has improved because training and testing time do not increase when we include more nodes in the network.",
+      "citations": 106,
+      "source": "OpenAlex"
+    },
+    {
+      "title": "A distributed intrusion detection framework for vehicular Ad Hoc networks via federated learning and Blockchain",
+      "authors": [
+        "Fedwa Mansouri",
+        "Mounira Tarhouni",
+        "Bechir Alaya",
+        "Salah Zidi"
+      ],
+      "year": 2025,
+      "venue": "Ad Hoc Networks",
+      "doi": "10.1016/j.adhoc.2024.103677",
+      "url": "https://doi.org/10.1016/j.adhoc.2024.103677",
+      "abstract": "",
+      "citations": 46,
+      "source": "Crossref"
+    },
+    {
+      "title": "Data driven intrusion detection for 6LoWPAN based IoT systems",
+      "authors": [
+        "Faik Kerem Örs",
+        "Albert Levi"
+      ],
+      "year": 2023,
+      "venue": "Ad Hoc Networks",
+      "doi": "10.1016/j.adhoc.2023.103120",
+      "url": "https://doi.org/10.1016/j.adhoc.2023.103120",
+      "abstract": "",
+      "citations": 9,
+      "source": "Crossref"
+    },
+    {
+      "title": "Generative AI-based intrusion detection systems for intra-vehicle networks",
+      "authors": [
+        "Guettouche Asaouer",
+        "Djallel Eddine Boubiche"
+      ],
+      "year": 2026,
+      "venue": "Ad Hoc Networks",
+      "doi": "10.1016/j.adhoc.2025.104031",
+      "url": "https://doi.org/10.1016/j.adhoc.2025.104031",
+      "abstract": "",
+      "citations": 4,
+      "source": "Crossref"
+    },
+    {
+      "title": "Application of Active Learning Algorithm in Mobile Ad Hoc Network Intrusion Detection",
+      "authors": [
+        "Ming Yin"
+      ],
+      "year": 2023,
+      "venue": "2023 World Conference on Communication &amp; Computing (WCONF)",
+      "doi": "10.1109/wconf58270.2023.10234999",
+      "url": "https://doi.org/10.1109/wconf58270.2023.10234999",
+      "abstract": "",
+      "citations": 2,
+      "source": "Crossref"
+    },
+    {
+      "title": "Spatio-temporal graph neural networks for zero-day intrusion detection in low-altitude autonomous UAV swarms",
+      "authors": [
+        "Mahmoud Mohamed",
+        "Dina Mohamed",
+        "Khaled Alosman"
+      ],
+      "year": 2026,
+      "venue": "Ad Hoc Networks",
+      "doi": "10.1016/j.adhoc.2026.104251",
+      "url": "https://doi.org/10.1016/j.adhoc.2026.104251",
+      "abstract": "",
+      "citations": 1,
+      "source": "Crossref"
+    },
+    {
+      "title": "UpsFed-IDS: U-shaped split federated intrusion detection system for securing UAV communication in dynamic networks",
+      "authors": [
+        "Zongpu Wei",
+        "Jinsong Wang",
+        "Zening Zhao",
+        "Zhao Zhao",
+        "Kai Shi"
+      ],
+      "year": 2026,
+      "venue": "Ad Hoc Networks",
+      "doi": "10.1016/j.adhoc.2025.104133",
+      "url": "https://doi.org/10.1016/j.adhoc.2025.104133",
+      "abstract": "",
+      "citations": 1,
+      "source": "Crossref"
+    },
+    {
+      "title": "CPAI: A Controlled-Point Discriminant Analysis for robust IoT network intrusion detection",
+      "authors": [
+        "Van-Hoi Nguyen",
+        "Xuan-Ha Nguyen",
+        "Kim-Hung Le"
+      ],
+      "year": 2026,
+      "venue": "Ad Hoc Networks",
+      "doi": "10.1016/j.adhoc.2026.104369",
+      "url": "https://doi.org/10.1016/j.adhoc.2026.104369",
+      "abstract": "",
+      "citations": 0,
+      "source": "Crossref"
+    },
+    {
+      "title": "NINMix-KD: Statistical moment matching knowledge distillation for edge resource-constrained network intrusion detection",
+      "authors": [
+        "Mu Lin",
+        "Damin Zhang",
+        "Ji Zhao",
+        "Yuhan Yang"
+      ],
+      "year": 2026,
+      "venue": "Ad Hoc Networks",
+      "doi": "10.1016/j.adhoc.2026.104291",
+      "url": "https://doi.org/10.1016/j.adhoc.2026.104291",
+      "abstract": "",
+      "citations": 0,
+      "source": "Crossref"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+Intrusion detection systems (IDS) deployed in UAV ad hoc networks face a critical gap: existing deep
+learning detectors output a decision but not whether that decision should be trusted. We propose a
+graph-augmented dual-layer AI trust framework that (1) models the flying ad hoc network topology with
+a spatio-temporal graph neural network, and (2) adds a decision-credibility monitoring layer that
+produces explainable per-decision trust scores. The credibility layer is trained with a calibration
+objective and yields human-readable attributions over graph edges, enabling operators to distinguish
+genuine zero-day attacks from distribution shift in low-altitude autonomous swarms. Experiments on
+two UAV swarm datasets show a 6.4 point F1 gain over the strongest graph baseline and a 41 percent
+reduction in false alarms under topology churn, with only 3.2 ms additional latency on embedded
+hardware. We further release an open-source implementation and a benchmark dataset for UAV swarm
+intrusion detection under mobility-induced distribution shift.
