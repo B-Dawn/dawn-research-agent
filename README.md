@@ -30,6 +30,25 @@ Windows 可直接双击 `install.bat` 安装后用 `run-app.bat` 启动。
 
 **模型配置**：默认预设腾讯混元（OpenAI 兼容，需自备 API Key）；也支持 DeepSeek / 本地 Ollama / 自定义端点。把服务商给的 API 信息整段粘贴到「设置 → API 信息识别」可自动识别填充。
 
+## Docker 部署
+
+镜像基于 `python:3.12-slim`，零第三方依赖、无需 pip 安装：
+
+```bash
+# 一键启动（首次会自动构建镜像）
+docker compose up -d --build
+
+# 查看日志 / 停止
+docker compose logs -f
+docker compose down
+```
+
+启动后访问 `http://<主机IP>:8787`（本机为 `http://127.0.0.1:8787`）。
+
+- **数据持久化**：所有业务数据存在命名卷 `dawn-data` 中，重建容器/升级镜像不丢数据
+- **数据迁移**：`docker run --rm -v dawn-data:/data -v "$PWD:/backup" alpine tar czf /backup/dawn-data.tar.gz /data`
+- **局域网访问**：容器内监听 `0.0.0.0`，放行宿主机 8787 端口即可跨设备使用
+
 ## 数据与隐私
 
 - 所有运行数据存放在 `skills/research-agent/data/`（已被 `.gitignore` 排除），**不会**提交到仓库
@@ -41,6 +60,7 @@ Windows 可直接双击 `install.bat` 安装后用 `run-app.bat` 启动。
 ```
 ├─ install.bat / install.ps1 / uninstall.bat   # Windows 安装脚本
 ├─ run-app.bat                                 # 启动脚本
+├─ Dockerfile / docker-compose.yml             # Docker 部署
 └─ skills/research-agent/
    ├─ SKILL.md                                 # 能力说明
    ├─ app/                                     # Web 应用（web_app.py / app / workbench / auth / team_store / model_bridge）

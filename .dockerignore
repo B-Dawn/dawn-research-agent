@@ -1,0 +1,13 @@
+# 构建上下文瘦身：只把 app 目录打进镜像
+*
+!skills/
+!skills/research-agent/
+!skills/research-agent/app/
+skills/research-agent/app/__pycache__/
+skills/research-agent/app/*.pyc
+skills/research-agent/app/*.log
+skills/research-agent/app/data/
+!Dockerfile
+!docker-compose.yml
+!README.md
+!LICENSE

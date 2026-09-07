@@ -1,0 +1,13 @@
+services:
+  dawn:
+    build: .
+    image: dawn-research-agent:latest
+    container_name: dawn
+    ports:
+      - "8787:8787"          # 左边是宿主机端口，冲突时可改（如 "9000:8787"）
+    volumes:
+      - dawn-data:/app/data  # 所有业务数据（账户/论文/草稿）持久化在命名卷
+    restart: unless-stopped  # 开机自启、崩溃自动拉起
+
+volumes:
+  dawn-data:
