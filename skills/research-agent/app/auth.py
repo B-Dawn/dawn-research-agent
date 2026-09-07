@@ -43,7 +43,17 @@ def _save(path, obj):
         json.dump(obj, f, ensure_ascii=False, indent=1)
         f.flush()
         os.fsync(f.fileno())
-    os.replace(tmp, path)
+    for attempt in range(5):  # Windows 瞬时文件锁（杀毒/索引器）重试
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            if attempt == 4:
+                break
+            time.sleep(0.15)
+    # 兜底：锁持续存在时直接写目标文件
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(obj, f, ensure_ascii=False, indent=1)
 
 
 def _users():
@@ -114,11 +124,20 @@ def register(data):
     obj = _users()
     if any(u["name"] == name for u in obj.get("users", [])):
         return {"ok": False, "error": "用户名已存在"}
-    obj.setdefault("users", []).append(_mk_user(name, pwd, role="member",
+    role = data.get("role") if data.get("role") in ("member", "teacher") else "member"
+    obj.setdefault("users", []).append(_mk_user(name, pwd, role=role,
                                                 display=data.get("display") or "",
                                                 email=data.get("email") or ""))
+    pending = False
+    if role == "teacher":  # 导师注册需管理员审核：先置为停用，审核=启用
+        obj["users"][-1]["active"] = False
+        pending = True
     _save_users(obj)
-    return {"ok": True, "user": _public(obj["users"][-1])}
+    out = {"ok": True, "user": _public(obj["users"][-1])}
+    if pending:
+        out["pending"] = True
+        out["message"] = "导师账户注册成功，需管理员在「管理员 → 账户管理」审核通过后方可登录"
+    return out
 
 
 def login(data):
@@ -128,6 +147,9 @@ def login(data):
     for u in obj.get("users", []):
         if u["name"] == name:
             if not u.get("active", True):
+                if u.get("role") == "teacher":
+                    return {"ok": False, "pending_teacher": True,
+                            "error": "导师账户待管理员审核通过后方可登录"}
                 return {"ok": False, "error": "该账户已被停用，请联系管理员"}
             if not verify(pwd, u):
                 return {"ok": False, "error": "用户名或密码错误"}
@@ -226,7 +248,7 @@ def update_user(data):
         return {"ok": False, "error": "不能停用超级管理员"}
 
     def fn(u):
-        if data.get("role") in ("admin", "member"):
+        if data.get("role") in ("admin", "teacher", "member"):
             u["role"] = data["role"]
         if data.get("active") is not None:
             u["active"] = bool(data["active"])

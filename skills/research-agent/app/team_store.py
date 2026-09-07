@@ -114,6 +114,8 @@ def add_member(data):
         m = _pick(data, MEMBER_FIELDS)
         if not m.get("name"):
             return None
+        for k, n in (("name", 40), ("display", 40), ("role", 20), ("expertise", 200), ("notes", 1000)):
+            m[k] = _clip(m.get(k), n)
         m["id"] = _uid("m", obj.get("members", []))
         m.setdefault("role", "成员")
         m.setdefault("joined", now().split(" ")[0])
@@ -164,6 +166,8 @@ def add_task(data):
         t = _pick(data, TASK_FIELDS)
         if not t.get("title"):
             return None
+        for k, n in (("title", 150), ("assignee", 40), ("priority", 10), ("module", 20), ("notes", 1000), ("status", 20)):
+            t[k] = _clip(t.get(k), n)
         t["id"] = _uid("t", obj.get("tasks", []))
         t.setdefault("status", "todo")
         t.setdefault("priority", "中")
@@ -215,6 +219,11 @@ def get_paper(pid):
     return None
 
 
+def _clip(v, n):
+    """字段统一截断：超长输入静默裁剪到上限。"""
+    return str(v or "").strip()[:n]
+
+
 def create_paper(data):
     def fn(obj):
         title = (data.get("title") or "").strip()
@@ -222,11 +231,11 @@ def create_paper(data):
             return None
         p = {
             "id": _uid("p", obj.get("papers", [])),
-            "title": title,
-            "owner": data.get("owner") or "",
-            "created_by": data.get("created_by") or "",
-            "status": data.get("status") or "draft",
-            "target_journal": data.get("target_journal") or "",
+            "title": _clip(title, 200),
+            "owner": _clip(data.get("owner"), 40),
+            "created_by": _clip(data.get("created_by"), 40),
+            "status": _clip(data.get("status"), 20) or "draft",
+            "target_journal": _clip(data.get("target_journal"), 120),
             "created": now(),
             "updated": now(),
             "sections": [],   # {key,title,assignee,status,version,content}
@@ -400,6 +409,9 @@ def add_experiment(data):
         e = _pick(data, EXP_FIELDS)
         if not e.get("name"):
             return None
+        for k, n in (("name", 150), ("dataset", 120), ("owner", 40), ("status", 20),
+                     ("seed", 60), ("hypothesis", 300), ("notes", 2000)):
+            e[k] = _clip(e.get(k), n)
         e["id"] = _uid("e", obj.get("experiments", []))
         e.setdefault("owner", "")
         e.setdefault("status", "registered")

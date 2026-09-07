@@ -2,7 +2,7 @@
 
 面向研究生与科研人员的**论文全流程助手**（Web 应用）。**零第三方依赖**——后端只用 Python 标准库（http.server），前端单页原生 HTML/JS，`python web_app.py` 即可运行。
 
-> 作者 by B_Dawn · V0.7.2
+> 作者 by B_Dawn · V0.8.0
 
 ## 功能总览
 

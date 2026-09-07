@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>破晓 · 科研智能体 V0.1</title>
+<title>破晓 · 科研智能体 v__APP_VERSION__</title>
 <style>
   :root{
     /* 默认皮肤：白蓝（清爽） */
@@ -108,7 +108,8 @@
   .btn-mini:hover{border-color:var(--accent);color:var(--accent)}
   .btn-mini.danger:hover{border-color:var(--err);color:var(--err)}
   .tbl{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px}
-  .tbl th,.tbl td{border:1px solid var(--border);padding:7px 9px;text-align:left}
+  .tbl th,.tbl td{border:1px solid var(--border);padding:7px 9px;text-align:left;overflow-wrap:anywhere;word-break:break-word}
+  .md td,.md th,.bubble{overflow-wrap:anywhere;word-break:break-word}
   .tbl th{background:var(--panel2);color:var(--text)}
   /* 对话 */
   .chat-card{display:flex;flex-direction:column;height:calc(100vh - 150px)}
@@ -145,6 +146,7 @@
   .tagrole{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;margin-left:6px}
   .tagrole.admin{background:var(--accent-soft);color:var(--accent)}
   .tagrole.member{background:var(--panel2);color:var(--muted)}
+  .tagrole.teacher{background:var(--accent-soft);color:var(--accent2)}
   .acct-tbl td .btn-mini{margin:1px 2px}
   /* 论文引导流程图 */
   .g-flow{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
@@ -165,8 +167,10 @@
   }
   .nav-head:hover{color:var(--text)}
   .nav-head .caret{transition:transform .15s;font-size:10px}
-  .nav-group.collapsed .nav-sub{display:none}
+  .nav-sub{max-height:420px;opacity:1;overflow:hidden;transition:max-height .28s ease,opacity .22s ease,transform .28s ease;transform-origin:top}
+  .nav-group.collapsed .nav-sub{max-height:0;opacity:0;transform:translateY(-4px)}
   .nav-group.collapsed .caret{transform:rotate(-90deg)}
+  .nav-sub button{transition:padding-left .2s ease,background .15s ease}
   .nav-sub button{padding-left:28px;font-size:13px}
   /* 文件上传按钮美化 */
   input[type="file"]{
@@ -204,10 +208,15 @@
   <div class="card">
     <div class="logo">🛰️</div>
     <h1 style="margin:0 0 4px">破晓</h1>
-    <p class="sub" style="margin:0 0 18px">科研智能体 · V0.1 · by B_Dawn · 请登录后使用</p>
-    <div class="row"><div style="flex:1"><label>用户名</label><input id="g-name" placeholder="请输入用户名" autocomplete="username"></div></div>
-    <div class="row hidden" id="g-display-row"><div style="flex:1"><label>显示名（仅注册时填写，登录后在系统界面展示）</label><input id="g-display" placeholder="如：张三"></div></div>
-    <div class="row"><div style="flex:1"><label>密码</label><input id="g-pwd" type="password" placeholder="请输入密码" autocomplete="current-password"></div></div>
+    <p class="sub" style="margin:0 0 18px">科研智能体 · v__APP_VERSION__ · by B_Dawn · 请登录后使用</p>
+    <div class="row"><div style="flex:1"><label>用户名</label><input id="g-name" placeholder="请输入用户名" autocomplete="username" maxlength="32"></div></div>
+    <div class="row hidden" id="g-role-row"><div style="flex:1"><label>注册身份</label>
+      <select id="g-role" style="width:100%">
+        <option value="member">学生（注册后立即使用）</option>
+        <option value="teacher">导师（需管理员审核后使用）</option>
+      </select></div></div>
+    <div class="row hidden" id="g-display-row"><div style="flex:1"><label>显示名（仅注册时填写，登录后在系统界面展示）</label><input id="g-display" placeholder="如：张三" maxlength="40"></div></div>
+    <div class="row"><div style="flex:1"><label>密码</label><input id="g-pwd" type="password" placeholder="请输入密码" autocomplete="current-password" maxlength="64"></div></div>
     <div class="status" id="g-status"></div>
     <div style="display:flex;gap:10px;margin-top:12px">
       <button class="run" id="g-login">登录</button>
@@ -219,7 +228,7 @@
 </div>
 <div class="layout">
   <aside class="sidebar">
-    <div class="brand">破晓<small>科研智能体 · V0.1 · by B_Dawn</small></div>
+    <div class="brand">破晓<small>科研智能体 · v__APP_VERSION__ · by B_Dawn</small></div>
     <nav class="nav" id="nav">
       <button data-tab="guide">🧭 论文十步走</button>
       <button data-tab="chat" class="active">💬 智能对话</button>
@@ -238,6 +247,7 @@
           <button data-tab="write">写作综述</button>
           <button data-tab="mypaper">我的论文</button>
           <button data-tab="journal">选刊</button>
+          <button data-tab="format">论文格式检查</button>
         </div>
       </div>
       <div class="nav-group">
@@ -254,7 +264,6 @@
         <div class="nav-sub">
           <button data-tab="collab">合作对接</button>
           <button data-tab="team">协作中心</button>
-          <button data-tab="paper">论文协作</button>
           <button data-tab="reviewhub">评审工作台</button>
         </div>
       </div>
@@ -294,7 +303,7 @@
         </div>
         <div class="chat-input">
           <textarea id="chat-in" rows="2"
-            placeholder="问我：检索 UAV 入侵检测近三年论文 / 生成对比矩阵 / 帮我选刊：&lt;粘贴摘要&gt; / 推荐下个方向 …（Enter 发送，Shift+Enter 换行）"></textarea>
+            placeholder="问我：检索 machine learning intrusion detection 近三年论文 / 生成对比矩阵 / 帮我选刊：&lt;粘贴摘要&gt; / 粘贴简历帮我定研究方向 …（Enter 发送，Shift+Enter 换行）"></textarea>
           <button class="run" id="chat-btn">发送</button>
         </div>
         <p class="chat-hint">自然语言即可。检索结果、对比矩阵、选刊打分、方向推荐会直接以 Markdown 显示在对话里。上方可为本轮对话切换 API/模型，或运行「技能中心」的技能。</p>
@@ -307,7 +316,7 @@
         <div class="row">
           <div style="flex:3">
             <label>检索式（建议英文）</label>
-            <input id="s-query" value="UAV ad hoc network intrusion detection" placeholder="如 graph neural network IDS">
+            <input id="s-query" value="UAV ad hoc network intrusion detection" placeholder="如：machine learning / intrusion detection" maxlength="300">
           </div>
           <div>
             <label>数据源</label>
@@ -423,7 +432,44 @@
         <div class="status" id="j-status"></div>
       </div>
       <div class="card out hidden" id="j-out"><div class="md" id="j-md"></div></div>
+    
     </section>
+    <section data-pane="format" class="hidden">
+        <div class="card">
+        <h3 style="margin-top:0">① 上传论文要求 / 模板 <span style="font-weight:400;color:var(--muted);font-size:12px">（期刊要求、学校模板、导师要求——上传后自动生成必需章节清单，检查时逐项核对）</span></h3>
+        <div class="row">
+          <div><label>适用类型</label>
+            <select id="ft-type"><option value="thesis">本科毕业论文</option><option value="journal">期刊论文</option></select></div>
+          <div><label>上传要求 / 模板文件（.docx/.md/.txt/.json）</label><input type="file" id="ft-req-file" accept=".docx,.md,.txt,.json"></div>
+          <div style="flex:1"><label>&nbsp;</label><button class="run ghost" id="ft-t-load" style="margin-top:0">载入当前模板</button></div>
+        </div>
+        <label>必需章节 / 要素（每行一项，可手动增删后保存）</label>
+        <textarea id="ft-template" style="min-height:120px" placeholder="封面&#10;原创性声明&#10;摘要&#10;Abstract&#10;目录&#10;第一章 绪论&#10;…&#10;结论&#10;参考文献&#10;致谢&#10;附录"></textarea>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="run" id="ft-t-save">保存模板</button>
+          <span class="status" id="ft-t-status"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">② 上传论文（用于检查） <span style="font-weight:400;color:var(--muted);font-size:12px">（按 ① 中生效的模板逐项核对格式）</span></h3>
+        <div class="row">
+          <div><label>上传论文（.docx）</label><input type="file" id="ft-paper-file" accept=".docx"></div>
+          <div style="flex:2"><label>或从「我的论文」载入</label>
+            <select id="ft-paper"><option value="">— 选择已导入 Word 的条目 —</option></select></div>
+          <div><label>&nbsp;</label><button class="run ghost" id="ft-loadpaper" style="margin-top:0">载入</button></div>
+        </div>
+        <label>论文全文 / 章节（上传 / 载入 / 粘贴均可）</label>
+        <textarea id="ft-text" style="min-height:200px" placeholder="粘贴论文文本，或直接上传 .docx 论文…"></textarea>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="run" id="ft-run">运行格式检查</button>
+          <label style="display:flex;align-items:center;gap:5px;margin:0;color:var(--text);font-size:13px"><input type="checkbox" id="ft-ai" style="width:auto"> 附 AI 深度检查（需模型）</label>
+          <span class="status" id="ft-status"></span>
+        </div>
+        <div class="out hidden" id="ft-out"><div class="md" id="ft-md"></div></div>
+      </div>
+    </section>
+</section>
 
     <!-- 方向推荐 -->
     <section data-pane="recommend" class="hidden">
@@ -452,17 +498,17 @@
         <h3 style="margin-top:0">我的输入 · AI 判断</h3>
         <p style="color:var(--muted);margin-top:0">把你真实的研究情况填进来（可只填一部分），保存后点「AI 诊断」让模型基于你的输入做判断与建议——不再只靠关键词规则。</p>
         <div class="row">
-          <div><label>研究方向（中文）</label><input id="pe-direction_cn" placeholder="AI + 低空经济安全"></div>
+          <div><label>研究方向（中文）</label><input id="pe-direction_cn" placeholder="如：人工智能安全 / 数据安全与隐私保护"></div>
           <div><label>研究方向（英文，给 AI/检索用）</label><input id="pe-direction_en" placeholder="AI for low-altitude economy security"></div>
         </div>
         <div class="row">
-          <div style="flex:2"><label>技能栈（逗号分隔）</label><input id="pe-skills" placeholder="GNN, 可解释 AI, 入侵检测, UAV 自组网"></div>
+          <div style="flex:2"><label>技能栈（逗号分隔）</label><input id="pe-skills" placeholder="深度学习, 可解释 AI, 入侵检测, 联邦学习"></div>
           <div><label>目标期刊（逗号分隔）</label><input id="pe-target_journals" placeholder="IEEE T-ITS, DCN"></div>
         </div>
         <label>在投 / 已发表工作</label>
-        <textarea id="pe-works" style="min-height:52px" placeholder="T1：《Explainable Decision-Credibility Monitoring for IDS in UAV Ad Hoc Networks…》，目标 SCI Q2 IF≥7"></textarea>
+        <textarea id="pe-works" style="min-height:52px" placeholder="论文题目与投稿目标，如：某方向综述，目标 SCI Q2"></textarea>
         <label>创新点 N1–N5（每行一条，可贴你论文里的表述）</label>
-        <textarea id="pe-innovations" style="min-height:76px" placeholder="N1：…\nN2：…"></textarea>
+        <textarea id="pe-innovations" style="min-height:76px" placeholder="创新点1：…\n创新点2：…"></textarea>
         <label>时间 / 资源约束（很重要，AI 推荐方向会按它取舍）</label>
         <input id="pe-constraints" placeholder="三线并行（教学/科研/写作），每周科研约 10h，单卡 GPU">
         <label>短期目标</label>
@@ -477,7 +523,7 @@
       <div class="card">
         <h3 style="margin-top:0">确认最终研究方向 <span style="font-weight:400;color:var(--muted);font-size:12px">（AI 判断 + 人工修改后的定稿方向；后续文献调研/雷达都以此为准）</span></h3>
         <div class="row">
-          <div style="flex:3"><label>最终研究方向（一句话，可随时人工修改）</label><input id="wf-direction" placeholder=""></div>
+          <div style="flex:3"><label>最终研究方向（一句话，可随时人工修改）</label><input id="wf-direction" placeholder="" maxlength="200"></div>
         </div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <button class="run" id="wf-save">保存方向</button>
@@ -498,7 +544,11 @@
           <button class="run ghost" id="cb-refresh" style="margin-top:0">刷新目录与邀请</button>
           <span class="status" id="cb-status"></span>
         </div>
-        <h3 style="margin:14px 0 4px;font-size:13.5px">用户目录</h3>
+        <div class="row" style="margin-top:12px">
+          <div style="flex:2"><label>按用户名直接邀请</label><input id="cb-user" maxlength="40" placeholder="输入对方注册的用户名"></div>
+          <div><label>&nbsp;</label><button class="run ghost" id="cb-invite-btn" style="margin-top:0">邀请合作</button></div>
+        </div>
+        <h3 style="margin:14px 0 4px;font-size:13.5px">用户目录 <span style="font-weight:400;color:var(--muted);font-size:12px">（导师可见其他导师与全部学生；学生仅可见导师）</span></h3>
         <div class="out" id="cb-dir"></div>
         <h3 style="margin:14px 0 4px;font-size:13.5px">收到的邀请</h3>
         <div class="out" id="cb-inbox"></div>
@@ -522,7 +572,7 @@
             </div>
           </div>
           <div class="row">
-            <div><label>专长（逗号分隔）</label><input id="tm-skills" placeholder="GNN, 可解释 AI, 低空安全"></div>
+            <div><label>专长（逗号分隔）</label><input id="tm-skills" placeholder="机器学习, 数据分析, 学术写作"></div>
             <div><label>备注</label><input id="tm-note" placeholder="导师 / 同门…"></div>
           </div>
           <button class="run" id="tm-add">添加成员</button>
@@ -531,7 +581,7 @@
         <div class="card">
           <h3 style="margin-top:0">任务板</h3>
           <div class="row">
-            <div style="flex:2"><label>任务标题</label><input id="tk-title" placeholder="补实验：拓扑变化鲁棒性"></div>
+            <div style="flex:2"><label>任务标题</label><input id="tk-title" placeholder="补实验：不同随机种子下的稳健性" maxlength="150"></div>
             <div><label>指派（协作人）</label><select id="tk-assignee"></select></div>
           </div>
           <div class="row">
@@ -545,16 +595,16 @@
           <div class="out"><div class="md" id="tk-board"></div></div>
         </div>
       </div>
-    </section>
+    
+      <!-- 论文协作（已并入协作中心） -->
+      <div class="card">
 
-    <!-- 论文协作 -->
-    <section data-pane="paper" class="hidden">
       <div class="card">
         <h3 style="margin-top:0">论文协作</h3>
         <div class="row">
-          <div style="flex:3"><label>论文标题</label><input id="pp-title" placeholder="Explainable Decision-Credibility Monitoring for IDS in UAV Ad Hoc Networks"></div>
+          <div style="flex:3"><label>论文标题</label><input id="pp-title" placeholder="论文标题（简洁明确，一般不超过 25 个英文词或 30 个汉字）" maxlength="200"></div>
           <div><label>负责人（协作人）</label><select id="pp-owner"></select></div>
-          <div><label>目标期刊</label><input id="pp-journal" placeholder="Digital Communications and Networks"></div>
+          <div><label>目标期刊</label><input id="pp-journal" placeholder="Digital Communications and Networks" maxlength="120"></div>
         </div>
         <div class="row">
           <div><button class="run" id="pp-create" style="margin-top:14px">创建论文项目</button></div>
@@ -595,7 +645,9 @@
         </div>
         <span class="status" id="pp-collab-status"></span>
       </div>
-    </section>
+      </div>
+</section>
+
 
     <!-- 实验复现 -->
     <section data-pane="lab" class="hidden">
@@ -603,18 +655,18 @@
         <div class="card">
           <h3 style="margin-top:0">登记实验</h3>
           <div class="row">
-            <div style="flex:2"><label>实验名称</label><input id="ex-name" placeholder="GNN-IDS 在 UAV-DS1 的 F1 评测"></div>
-            <div><label>数据集</label><input id="ex-dataset" placeholder="UAV-DS1"></div>
+            <div style="flex:2"><label>实验名称</label><input id="ex-name" placeholder="基线模型在测试集上的 F1 评测" maxlength="150"></div>
+            <div><label>数据集</label><input id="ex-dataset" placeholder="实验数据集名称" maxlength="120"></div>
           </div>
           <div class="row">
             <div><label>负责人（协作人）</label><select id="ex-owner"></select></div>
             <div><label>状态</label>
               <select id="ex-status"><option value="registered">已登记</option><option value="running">运行中</option><option value="done">已完成</option><option value="failed">失败</option></select>
             </div>
-            <div><label>随机种子（逗号分隔）</label><input id="ex-seed" placeholder="42,2024"></div>
+            <div><label>随机种子（逗号分隔）</label><input id="ex-seed" placeholder="42,2024" maxlength="60"></div>
           </div>
           <label>假设（可空）</label>
-          <input id="ex-hyp" placeholder="图增强的可信监控层应显著降低拓扑抖动下的误报">
+          <input id="ex-hyp" placeholder="预期：方法 A 在指标 X 上显著优于基线" maxlength="300">
           <button class="run" id="ex-add">登记</button>
           <div class="status" id="ex-status-bar"></div>
         </div>
@@ -682,7 +734,7 @@
         <label>论文 / 开题报告文本（粘贴后提取数据集名）</label>
         <textarea id="ds-text" style="min-height:70px" placeholder="粘贴含数据集信息的段落…"></textarea>
         <div class="row">
-          <div style="flex:2"><label>数据集检索词（可手动修改）</label><input id="ds-query" placeholder="如 UAVIDS-2025 / network intrusion detection dataset"></div>
+          <div style="flex:2"><label>数据集检索词（可手动修改）</label><input id="ds-query" placeholder="如：某领域基准数据集名称 / 英文检索词"></div>
           <div><label>&nbsp;</label><button class="run" id="ds-extract" style="margin-top:0">从文本提取</button></div>
           <div><label>&nbsp;</label><button class="run" id="ds-search" style="margin-top:0">检索 Zenodo</button></div>
         </div>
@@ -706,7 +758,7 @@
               </select></div>
           </div>
           <label>方法描述（数据 / 模型 / 指标，越具体越好）</label>
-          <textarea id="ag-desc" style="min-height:90px" placeholder="如：UAVIDS-2025 五分类，LSTM，输入 41 维流量特征，Adam lr=1e-3，报 Macro-F1"></textarea>
+          <textarea id="ag-desc" style="min-height:90px" placeholder="如：五分类任务，LSTM 模型，输入特征维度、优化器与学习率、评估指标"></textarea>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
             <button class="run" id="ag-gen">生成</button>
             <button class="run ghost" id="ag-save">存草稿库</button>
@@ -774,11 +826,11 @@
         </div>
         <div class="row">
           <div style="flex:2"><label>Base URL（OpenAI 兼容端点，切预设会自动填好）</label>
-            <input id="ms-url" placeholder="https://api.hunyuan.cloud.tencent.com/v1"></div>
+            <input id="ms-url" placeholder="https://api.hunyuan.cloud.tencent.com/v1" maxlength="200"></div>
         </div>
         <div class="row">
-          <div><label>API Key（本地网关可留空）</label><input id="ms-key" type="password" placeholder="sk-…"></div>
-          <div><label>模型名</label><input id="ms-model" placeholder="hunyuan-turbos-latest"></div>
+          <div><label>API Key（本地网关可留空）</label><input id="ms-key" type="password" placeholder="sk-…" maxlength="200"></div>
+          <div><label>模型名</label><input id="ms-model" placeholder="hunyuan-turbos-latest" maxlength="120"></div>
         </div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <button class="run" id="ms-save" style="margin-top:10px">保存配置</button>
@@ -793,14 +845,14 @@
         <h3 style="margin-top:0">个人信息 <span style="font-weight:400;color:var(--muted);font-size:12px">（常规信息：显示名 / 邮箱 / 修改自己的密码）</span></h3>
         <div class="row">
           <div><label>用户名</label><input id="pi-name" disabled></div>
-          <div><label>显示名</label><input id="pi-display" placeholder="登录后展示的名字"></div>
-          <div><label>邮箱</label><input id="pi-email" placeholder="选填"></div>
+          <div><label>显示名</label><input id="pi-display" placeholder="登录后展示的名字" maxlength="40"></div>
+          <div><label>邮箱</label><input id="pi-email" placeholder="选填" maxlength="80"></div>
         </div>
         <button class="run" id="pi-save">保存个人信息</button>
         <span class="status" id="pi-status"></span>
         <div class="row" style="margin-top:8px">
-          <div><label>旧密码</label><input id="pi-old" type="password" placeholder="修改密码需验证"></div>
-          <div><label>新密码（≥6 位）</label><input id="pi-new" type="password"></div>
+          <div><label>旧密码</label><input id="pi-old" type="password" placeholder="修改密码需验证" maxlength="64"></div>
+          <div><label>新密码（≥6 位）</label><input id="pi-new" type="password" maxlength="64"></div>
           <div><label>&nbsp;</label><button class="run ghost" id="pi-pwd" style="margin-top:0">修改密码</button></div>
         </div>
         <span class="status" id="pi-pwd-status"></span>
@@ -835,7 +887,7 @@
         <div class="row">
           <div><label>技能文件</label>
             <input type="file" id="sk-file" accept=".zip,.md,.txt,.json"></div>
-          <div style="flex:1"><label>技能名称（上传 .md/.txt 时用，可留空）</label><input id="sk-name" placeholder="可选"></div>
+          <div style="flex:1"><label>技能名称（上传 .md/.txt 时用，可留空）</label><input id="sk-name" placeholder="可选" maxlength="40"></div>
         </div>
         <span class="status" id="sk-up-status"></span>
       </div>
@@ -872,7 +924,7 @@
       <div class="card">
         <h3 style="margin-top:0">文献库 <span style="font-weight:400;color:var(--muted);font-size:12px">（收录「文献检索」的真实结果——AI 永不生成文献条目；支持检索/批量精读/综合创新点）</span></h3>
         <div class="row">
-          <div style="flex:2"><label>新建参考文献文件夹</label><input id="rf-name" placeholder="如：可信 IDS 综述 · 核心 20 篇"></div>
+          <div style="flex:2"><label>新建参考文献文件夹</label><input id="rf-name" placeholder="如：某方向综述 · 核心 20 篇" maxlength="60"></div>
           <div><label>&nbsp;</label><button class="run" id="rf-create" style="margin-top:0">创建</button></div>
           <div><label>&nbsp;</label><button class="run ghost" id="rf-refresh" style="margin-top:0">刷新</button></div>
         </div>
@@ -912,7 +964,7 @@
         <div class="row">
           <div><label>类型</label>
             <select id="vh-kind"><option value="ai_blind">AI 专家盲审</option><option value="peer">协作者审核</option></select></div>
-          <div style="flex:2"><label>评审标题</label><input id="vh-title" placeholder="如：三层信任框架 · 方法论部分"></div>
+          <div style="flex:2"><label>评审标题</label><input id="vh-title" placeholder="如：方法论部分初稿" maxlength="60"></div>
         </div>
         <label>评审材料（粘贴方向结论 / 创新点 / 方法论 / 论文段落）</label>
         <textarea id="vh-content" style="min-height:110px" placeholder="粘贴需要被评审的内容…"></textarea>
@@ -986,7 +1038,7 @@
       <div class="card">
         <h3 style="margin-top:0">文献综述工作台 <span style="font-weight:400;color:var(--muted);font-size:12px">（基于最近一次检索结果，或粘贴检索 JSON）</span></h3>
         <div class="row">
-          <div style="flex:2"><label>综述主题</label><input id="rv-topic" placeholder="如：UAV 自组网中的可信入侵检测"></div>
+          <div style="flex:2"><label>综述主题</label><input id="rv-topic" placeholder="如：研究方向的中文表述"></div>
           <div><label>综述角度</label>
             <select id="rv-angle">
               <option value="gap">研究空白（批判性）</option>
@@ -1036,7 +1088,7 @@
       <div class="card">
         <h3 style="margin-top:0">我的论文 <span style="font-weight:400;color:var(--muted);font-size:12px">（个人论文台账，仅本人可见；与他人合写请用「协作中心」）</span></h3>
         <div class="row">
-          <div style="flex:2"><label>论文标题</label><input id="mp-title" placeholder="如：Explainable Decision-Credibility Monitoring for IDS in UAV Ad Hoc Networks"></div>
+          <div style="flex:2"><label>论文标题</label><input id="mp-title" placeholder="论文标题（简洁明确）" maxlength="200"></div>
           <div><label>类型</label>
             <select id="mp-type">
               <option>期刊论文</option>
@@ -1046,8 +1098,8 @@
             </select></div>
         </div>
         <div class="row">
-          <div><label>目标期刊 / 会议</label><input id="mp-journal" placeholder="如：IEEE T-ITS"></div>
-          <div><label>截止日期</label><input id="mp-deadline" type="date"></div>
+          <div><label>目标期刊 / 会议</label><input id="mp-journal" placeholder="如：IEEE T-ITS" maxlength="120"></div>
+          <div><label>截止日期</label><input id="mp-deadline" type="date" maxlength="20"></div>
           <div><label>状态</label>
             <select id="mp-status">
               <option value="planning">规划中</option>
@@ -1060,7 +1112,7 @@
             </select></div>
         </div>
         <label>备注（创新点/进度提醒，可选）</label>
-        <input id="mp-notes" placeholder="如：N1–N5 对应框架五模块，先补实验">
+        <input id="mp-notes" placeholder="备注：进度安排、待补实验等（可空）" maxlength="4000">
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <button class="run" id="mp-add">添加论文</button>
           <button class="run ghost" id="mp-refresh">刷新</button>
@@ -1071,6 +1123,29 @@
         <div class="out" id="mp-list"></div>
         <h3 style="margin:14px 0 4px;font-size:13.5px">参与的合作论文 <span style="font-weight:400;color:var(--muted);font-size:12px">（被创建者加为协作者后自动收录；权限由创建者授予）</span></h3>
         <div class="out" id="mp-shared"></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">论文降重 <span style="font-weight:400;color:var(--muted);font-size:12px">（AI 改写，三种模式；结果可存入草稿库；术语/引用/数据原样保留，请人工复核后使用）</span></h3>
+        <div class="row">
+          <div style="flex:2"><label>选择论文</label>
+            <select id="dp-paper"><option value="">— 选择已导入 Word 的条目 —</option></select></div>
+          <div><label>降重模式</label>
+            <select id="dp-mode">
+              <option value="paraphrase_dup">查重降重（中文，八字不重复）</option>
+              <option value="paraphrase_aigc">降 AI 率（知网 AIGC 五维改写）</option>
+              <option value="paraphrase_en">英文改写（academic paraphrasing）</option>
+            </select></div>
+          <div><label>&nbsp;</label><button class="run ghost" id="dp-load" style="margin-top:0">载入全文</button></div>
+        </div>
+        <label>待降重文本（载入或直接粘贴）</label>
+        <textarea id="dp-text" style="min-height:140px" placeholder="粘贴需要降重的段落/章节，或载入论文全文…"></textarea>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="run" id="dp-run">运行降重</button>
+          <button class="run ghost" id="dp-save">结果存入草稿库</button>
+          <span class="status" id="dp-status"></span>
+        </div>
+        <div class="out hidden" id="dp-out"><div class="md" id="dp-md"></div></div>
       </div>
     </section>
 
@@ -1143,6 +1218,7 @@
   </main>
   </div>
 </div>
-<script src="app.js"></script>
+<script>window.__errs=[];window.addEventListener("error",function(e){window.__errs.push(e.message+" @ "+(e.filename||"")+":"+e.lineno)});</script>
+<script src="app.js?v=__APP_VERSION__"></script>
 </body>
 </html>

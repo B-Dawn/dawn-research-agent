@@ -4,6 +4,7 @@
 function escapeHtml(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
+const esc = (s) => escapeHtml(s === undefined || s === null ? "" : String(s));
 function inline(s) {
   // 行内：先转义，再做 **粗体** 与 `代码`
   s = escapeHtml(s);
@@ -105,7 +106,8 @@ function renderUserbar() {
   const box = $("userbar-top");
   if (!box) return;
   if (ME) {
-    const roleTag = '<span class="tagrole ' + (ME.role === "admin" ? "admin" : "member") + '">' + (ME.role === "admin" ? "管理员" : "成员") + "</span>";
+    const ROLE_ZH = { admin: "管理员", teacher: "导师", member: "学生" };
+const roleTag = '<span class="tagrole ' + ME.role + '">' + (ROLE_ZH[ME.role] || ME.role) + "</span>";
     box.innerHTML = '<div class="who">你好，<b>' + escapeHtml(ME.display || ME.name) + "</b>" + roleTag + "</div>" +
       '<button class="run ghost" id="ub-logout">退出登录</button>';
     $("ub-logout").addEventListener("click", doLogout);
@@ -146,6 +148,7 @@ function setGateMode(m) {
   gateMode = m;
   const isReg = m === "register";
   $("g-display-row").classList.toggle("hidden", !isReg);
+  const rr = $("g-role-row"); if (rr) rr.classList.toggle("hidden", !isReg);
   $("g-login").textContent = isReg ? "注册" : "登录";
   $("g-reg").textContent = isReg ? "返回登录" : "注册新账户";
 }
@@ -155,10 +158,18 @@ function gateSubmit(isLogin) {
   if (!name || !pwd) { setStatus("g-status", "用户名和密码都要填", "err"); return; }
   setStatus("g-status", isLogin ? "登录中…" : "注册中…");
   const payload = { action: isLogin ? "login" : "register", name, password: pwd };
-  if (!isLogin) { const d = $("g-display").value.trim(); if (d) payload.display = d; }
+  if (!isLogin) {
+    const d = $("g-display").value.trim(); if (d) payload.display = d;
+    const rsel = $("g-role"); if (rsel) payload.role = rsel.value;
+  }
   post("auth", payload)
     .then(r => {
       if (!r.ok) { setStatus("g-status", r.error || "操作失败", "err"); return; }
+      if (r.pending) {  // 导师注册：待审核，不自动进入
+        setGateMode("login");
+        setStatus("g-status", "✅ " + (r.message || "注册成功，待管理员审核") + "。审核通过后用此账户登录。", "ok");
+        return;
+      }
       if (r.token) localStorage.setItem("ra_token", r.token);
       refreshMe().then(() => { if (ME) { setGateMode("login"); enterApp(); } else setStatus("g-status", "登录成功但未能获取账户信息", "err"); });
     })
@@ -195,6 +206,7 @@ const TITLES = {
   matrix: ["对比矩阵", "把检索结果转成可填写的文献对比矩阵，自动填充年份/标题/被引/链接。"],
   plot: ["出图", "读 CSV 生成论文级 SVG 图（折线/柱状/散点），零依赖，可直接贴进论文。"],
   journal: ["选刊", "按摘要与期刊 scope 契合度打分排序，输出初筛报告与人工决策表。"],
+  format: ["论文格式检查", "结构完整性 / 参考文献编号 / 图表标号 / 标点 / 段落规则检查；支持本科毕业论文与期刊论文，可按你的模板自定义必需章节。"],
   digest: ["论文精读", "粘贴论文文本：技术点分析 / 创新点总结 / 可行性分析 / 空白研究分析 / 中英翻译；只依据文本不编造。"],
   recommend: ["方向推荐", "技能×方向交叉检索按复用度/热度/数据/时间打分（规则版），或用 AI 深度推荐（需配置模型）。"],
   profile: ["科研画像", "自主输入研究方向/创新点/约束，AI 才能据此诊断画像、驱动方向推荐（模型配置已移到「设置」）。"],
@@ -209,16 +221,16 @@ function switchTab(tab) {
   document.querySelectorAll("[data-pane]").forEach(p => p.classList.toggle("hidden", p.dataset.pane !== tab));
   $("tabTitle").textContent = TITLES[tab][0];
   $("tabSub").textContent = TITLES[tab][1];
-  if (tab === "team") { loadMembers(); refreshTasks(); fillPartnerSelects(); }
+  if (tab === "team") { loadMembers(); refreshTasks(); refreshPapers(); fillPartnerSelects(); }
   if (tab === "collab") { loadDir(); loadInvites(); }
-  if (tab === "paper") { refreshPapers(); loadPartnersForReview(); }
   if (tab === "lab") { refreshExps(); refreshReps(); fillPartnerSelects(); }
   if (tab === "algo") { loadTpPapers(); listMine(); }
   if (tab === "profile") { fillProfileExtra(); loadDirection(); }
   if (tab === "settings") { refreshModelStatus(); }
   if (tab === "write") { loadDocs(); loadRevs(); }
+  if (tab === "format") { loadFtPapers(); loadFtTemplate(); }
   if (tab === "memory") { loadMems(); }
-  if (tab === "mypaper") { loadMyPapers(); }
+  if (tab === "mypaper") { loadMyPapers(); loadDpPapers(); }
   if (tab === "guide") { bootGuide(); }
   if (tab === "chat") { refreshChatSelectors(); }
   if (tab === "reflib") { loadFolders(); }
@@ -238,9 +250,12 @@ function switchTab(tab) {
   renderTopTabs();
 }
 document.querySelectorAll(".nav button[data-tab]").forEach(b => b.addEventListener("click", () => switchTab(b.dataset.tab)));
-// 侧栏折叠分组：点击大标题收起/展开，并记住状态
+// 侧栏折叠分组：点击大标题 = 手风琴（展开该组并收起其他组；再点一次可全部收起），状态记住
 document.querySelectorAll(".nav-head").forEach(h => h.addEventListener("click", () => {
-  h.closest(".nav-group").classList.toggle("collapsed");
+  const g = h.closest(".nav-group");
+  const willOpen = g.classList.contains("collapsed");
+  document.querySelectorAll(".nav-group").forEach(x => x.classList.add("collapsed"));
+  if (willOpen) g.classList.remove("collapsed");
   persistNav();
 }));
 function persistNav() {
@@ -594,8 +609,8 @@ async function loadMyPapers() {
 $("mp-shared").addEventListener("click", (ev) => {
   const b = ev.target.closest("button.btn-mini");
   if (!b) return;
-  switchTab("paper");
-  setTimeout(() => { $("pp-sel").value = b.dataset.pid; loadPaper(); }, 60);
+  switchTab("team");
+  setTimeout(() => { $("pp-sel").value = b.dataset.pid; loadPaper(); }, 300);
 });
 function renderMyPapers() {
   const box = $("mp-list");
@@ -633,21 +648,58 @@ async function loadDir() {
   if (!r.ok) return;
   _dirCache = (r.users || []).filter(u => u.name !== (ME && ME.name));
   const box = $("cb-dir");
-  if (!_dirCache.length) { box.innerHTML = '<p class="chat-hint">系统里还没有其他注册用户。把对方拉进来（注册账户）即可发邀请。</p>'; return; }
-  box.innerHTML = '<table class="tbl"><tr><th>用户名</th><th>显示名</th><th>角色</th><th></th></tr>' +
-    _dirCache.map(u =>
-      '<tr><td>' + esc(u.name) + '</td><td>' + esc(u.display || u.name) + '</td><td>' + esc(u.role) + '</td>' +
-      '<td><button class="btn-mini" data-ac="invite" data-name="' + esc(u.name) + '">邀请合作</button></td></tr>').join("") +
-    '</table>';
+  const isAdmin = ME && ME.role === "admin";
+  const ROLE_ZH = { admin: "管理员", teacher: "导师", member: "学生" };
+  if (!_dirCache.length) { box.innerHTML = '<p class="chat-hint">' + (isAdmin ? "系统里还没有其他用户。" : "系统里还没有其他注册用户。把对方拉进来（注册账户）即可发邀请。") + '</p>'; return; }
+  box.innerHTML = '<table class="tbl"><tr><th>用户名</th><th>显示名</th><th>角色</th><th>状态</th><th></th></tr>' +
+    _dirCache.map(u => {
+      const isSelf = ME && u.name === ME.name;
+      const isTeacher = u.role === "teacher";
+      const pending = isTeacher && u.active === false;
+      let ops = '<button class="btn-mini" data-ac="invite" data-name="' + esc(u.name) + '">邀请合作</button>';
+      if (isAdmin && !isSelf) {
+        const nextRole = isTeacher ? "member" : "teacher";
+        ops += ' <button class="btn-mini" data-cb="role" data-name="' + esc(u.name) + '" data-role="' + nextRole + '">' +
+          (isTeacher ? "设为学生" : "设为导师") + '</button>';
+        if (pending) ops += ' <button class="btn-mini" data-cb="approve" data-name="' + esc(u.name) + '">✅ 审核通过</button>';
+      }
+      const roleTxt = (ROLE_ZH[u.role] || u.role) + (pending ? ' <span class="tag">待审核</span>' : "");
+      return '<tr><td>' + esc(u.name) + '</td><td>' + esc(u.display || u.name) + '</td><td>' + roleTxt + '</td>' +
+        '<td>' + (pending ? "待审核" : (u.active === false ? "停用" : "启用")) + '</td><td>' + ops + '</td></tr>';
+    }).join("") +
+    '</table>' + (isAdmin ? '<p class="chat-hint">你是管理员：可直接为用户切换导师/学生角色、审核导师注册。</p>' : "");
 }
 $("cb-dir").addEventListener("click", async (ev) => {
-  const b = ev.target.closest("button.btn-mini");
+  const rb = ev.target.closest("button[data-cb]");
+  if (rb) {
+    const name = rb.dataset.name;
+    if (rb.dataset.cb === "role") {
+      const to = rb.dataset.role;
+      const r = await post("auth", { action: "update", name, role: to });
+      setStatus("cb-status", r.ok ? ("已将 " + name + " 设为 " + (to === "teacher" ? "导师" : "学生")) : r.error, r.ok ? "ok" : "err");
+      loadDir();
+    } else if (rb.dataset.cb === "approve") {
+      const r = await post("auth", { action: "update", name, active: true });
+      setStatus("cb-status", r.ok ? (name + " 已审核通过") : r.error, r.ok ? "ok" : "err");
+      loadDir();
+    }
+    return;
+  }
   if (!b || b.dataset.ac !== "invite") return;
   const msg = prompt("给 " + b.dataset.name + " 的邀请留言（可留空，如想合作的论文/方向）：");
   if (msg === null) return;
   const r = await post("collab", { action: "invite", to: b.dataset.name, message: msg });
   setStatus("cb-status", r.ok ? "邀请已发出" : (r.error || "发送失败"), r.ok ? "ok" : "err");
-  if (r.ok) { _cbData = r; renderInvites(); }
+  if (r.ok) loadInvites();
+});
+$("cb-invite-btn").addEventListener("click", async () => {
+  const to = $("cb-user").value.trim();
+  if (!to) { setStatus("cb-status", "请输入对方注册的用户名", "err"); return; }
+  const msg = prompt("给 " + to + " 的邀请留言（可留空）：");
+  if (msg === null) return;
+  const r = await post("collab", { action: "invite", to, message: msg });
+  setStatus("cb-status", r.ok ? "已向 " + to + " 发出邀请" : (r.error || "邀请失败"), r.ok ? "ok" : "err");
+  if (r.ok) { $("cb-user").value = ""; loadInvites(); }
 });
 async function loadInvites() {
   const r = await post("collab", { action: "list" });
@@ -1485,6 +1537,117 @@ $("sk-file").addEventListener("change", () => {
   reader.readAsDataURL(f);
 });
 
+// ---------------- 论文格式检查 ----------------
+async function loadFtPapers() {
+  const r = await post("mypaper", { action: "list" });
+  if (!r.ok) return;
+  const opts = '<option value="">— 选择已导入 Word 的条目 —</option>' +
+    (r.papers || []).map(p => '<option value="' + p.id + '">' + esc(p.title) + (p.file_name ? " 📄" : "") + '</option>').join("");
+  const el = $("ft-paper"); if (el) el.innerHTML = opts;
+}
+async function loadFtTemplate() {
+  const t = $("ft-type") ? $("ft-type").value : "thesis";
+  const r = await post("format", { action: "template_get", ptype: t });
+  if (r.ok) {
+    $("ft-template").value = (r.items || []).join("\n");
+    setStatus("ft-t-status", r.default ? "当前为内置标准结构（可自定义覆盖）" : "已加载你的自定义模板", r.default ? "" : "ok");
+  }
+}
+$("ft-type").addEventListener("change", loadFtTemplate);
+$("ft-t-load").addEventListener("click", loadFtTemplate);
+$("ft-t-save").addEventListener("click", async () => {
+  const r = await post("format", { action: "template_save",
+    ptype: $("ft-type").value, text: $("ft-template").value });
+  setStatus("ft-t-status", r.ok ? "模板已保存（" + r.count + " 项）" : (r.error || "保存失败"), r.ok ? "ok" : "err");
+});
+$("ft-loadpaper").addEventListener("click", async () => {
+  const id = $("ft-paper").value;
+  if (!id) { setStatus("ft-status", "先选择论文条目", "err"); return; }
+  setStatus("ft-status", "载入论文文本…");
+  const r = await post("mypaper", { action: "get_text", id });
+  if (!r.ok) { setStatus("ft-status", r.error || "载入失败（该条目需先在「我的论文」导入 Word）", "err"); return; }
+  $("ft-text").value = r.text || "";
+  setStatus("ft-status", "已载入 " + (r.text || "").length + " 字", "ok");
+});
+$("ft-paper-file").addEventListener("change", () => {
+  const f = $("ft-paper-file").files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    setStatus("ft-status", "解析论文中…");
+    const r = await post("format", { action: "upload_doc", kind: "paper",
+      data_b64: reader.result.split(",")[1], filename: f.name });
+    if (!r.ok) { setStatus("ft-status", r.error || "解析失败", "err"); return; }
+    $("ft-text").value = r.text || "";
+    setStatus("ft-status", "已载入论文（" + r.chars + " 字），可点「运行格式检查」", "ok");
+  };
+  reader.readAsDataURL(f);
+});
+$("ft-req-file").addEventListener("change", () => {
+  const f = $("ft-req-file").files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    setStatus("ft-status", "解析论文要求中…");
+    const r = await post("format", { action: "upload_doc", kind: "req",
+      data_b64: reader.result.split(",")[1], filename: f.name,
+      ptype: $("ft-type").value });
+    if (!r.ok) { setStatus("ft-status", r.error || "解析失败", "err"); return; }
+    $("ft-template").value = (r.items || []).join("\n");
+    setStatus("ft-status", "✅ " + (r.note || "要求已保存为模板") + "，现在可运行格式检查", "ok");
+    loadFtTemplate();
+  };
+  reader.readAsDataURL(f);
+});
+$("ft-run").addEventListener("click", async () => {
+  const text = $("ft-text").value.trim();
+  if (text.length < 100) { setStatus("ft-status", "请粘贴论文全文或较长章节（≥100 字）", "err"); return; }
+  setStatus("ft-status", "格式检查中…");
+  const r = await post("format", { action: "check", text,
+    ptype: $("ft-type").value, ai: $("ft-ai").checked });
+  if (!r.ok) { setStatus("ft-status", r.error || "检查失败", "err"); return; }
+  $("ft-out").classList.remove("hidden");
+  $("ft-md").innerHTML = renderMarkdown(r.markdown || "");
+  setStatus("ft-status", "完成：发现问题 " + r.problems + " 个，通过 " + r.pass + " 项" + (r.ai_md ? "（含 AI 补充）" : ""), r.problems ? "warn" : "ok");
+});
+
+// ---------------- 论文降重 ----------------
+async function loadDpPapers() {
+  const r = await post("mypaper", { action: "list" });
+  if (!r.ok) return;
+  const el = $("dp-paper"); if (!el) return;
+  el.innerHTML = '<option value="">— 选择已导入 Word 的条目 —</option>' +
+    (r.papers || []).map(p => '<option value="' + p.id + '">' + esc(p.title) + (p.file_name ? " 📄" : "") + '</option>').join("");
+}
+$("dp-load").addEventListener("click", async () => {
+  const id = $("dp-paper").value;
+  if (!id) { setStatus("dp-status", "先选择论文条目（需已在「我的论文」导入 Word）", "err"); return; }
+  setStatus("dp-status", "载入全文…");
+  const r = await post("mypaper", { action: "get_text", id });
+  if (!r.ok) { setStatus("dp-status", r.error || "载入失败", "err"); return; }
+  $("dp-text").value = r.text || "";
+  setStatus("dp-status", "已载入 " + (r.text || "").length + " 字", "ok");
+});
+let _dpLast = "";
+$("dp-run").addEventListener("click", async () => {
+  const text = $("dp-text").value.trim();
+  if (text.length < 50) { setStatus("dp-status", "待降重文本太短（≥50 字）；超长文本建议分段落处理", "err"); return; }
+  if (text.length > 6000) { setStatus("dp-status", "单次建议 ≤6000 字（当前 " + text.length + "），请分段降重", "err"); return; }
+  setStatus("dp-status", "降重中（AI 改写，约 1-2 分钟）…");
+  const r = await post("skills", { action: "run", skill: $("dp-mode").value, input: text });
+  if (!r.ok) { setStatus("dp-status", r.error || "降重失败", "err"); return; }
+  _dpLast = r.reply || "";
+  $("dp-out").classList.remove("hidden");
+  $("dp-md").innerHTML = renderMarkdown(_dpLast);
+  setStatus("dp-status", "降重完成（" + _dpLast.length + " 字）——请人工复核术语与引用后再用", "ok");
+});
+$("dp-save").addEventListener("click", async () => {
+  if (!_dpLast) { setStatus("dp-status", "还没有降重结果", "err"); return; }
+  const title = "降重改写 · " + (($("dp-paper").selectedOptions[0] || {}).text || $("dp-mode").selectedOptions[0].text) + " · " + new Date().toLocaleString();
+  const r = await post("write", { action: "save", kind: "dup", title, content: _dpLast });
+  setStatus("dp-status", r.ok ? "已存入草稿库（写作综述 → 草稿库可查看）" : (r.error || "保存失败"), r.ok ? "ok" : "err");
+});
+
 boot();
 
 // ---------------- 换肤（白蓝 / 暗夜蓝 / 青绿） ----------------
@@ -1509,7 +1672,6 @@ buildSkinSwitchers();
 
 
 // ---------------- 协作中心（成员 / 任务板 / 论文） ----------------
-const esc = (s) => escapeHtml(s === undefined || s === null ? "" : String(s));
 const mini = (label, danger, extra) =>
   '<button class="btn-mini' + (danger ? " danger" : "") + '" data-k="' + label + '"' + (extra || "") + ">" + esc(label) + "</button>";
 function bindMini(root, fnMap) {
@@ -1849,12 +2011,24 @@ async function loadAccounts() {
   for (const u of users) {
     const isAdmin = u.role === "admin";
     const active = u.active !== false;
-    let ops = '<button class="btn-mini" data-ac="role" data-name="' + esc(u.name) + '">' + (isAdmin ? "降为成员" : "设为管理员") + "</button>";
-    ops += '<button class="btn-mini" data-ac="toggle" data-name="' + esc(u.name) + '">' + (active ? "停用" : "启用") + "</button>";
+    const isTeacher = u.role === "teacher";
+    const pending = isTeacher && !active;
+    const ROLE_ZH2 = { admin: "管理员", teacher: "导师", member: "学生" };
+    let ops = "";
+    if (!isAdmin) {  // 管理员只是管理员：不改角色、不停用
+      const nextRole = isTeacher ? "member" : "teacher";
+      ops += '<button class="btn-mini" data-ac="role" data-name="' + esc(u.name) + '" data-role="' + nextRole + '">' +
+        (isTeacher ? "设为学生" : "设为导师") + "</button>";
+    }
+    if (!isAdmin) {
+      const targetActive = pending ? true : !active;
+      ops += '<button class="btn-mini" data-ac="toggle" data-name="' + esc(u.name) + '" data-active="' + targetActive + '">' +
+        (pending ? "✅ 审核通过" : (active ? "停用" : "启用")) + "</button>";
+    }
     ops += '<button class="btn-mini" data-ac="pwd" data-name="' + esc(u.name) + '">改密</button>';
     if (!isAdmin) ops += '<button class="btn-mini danger" data-ac="del" data-name="' + esc(u.name) + '">删除</button>';
-    html += "<tr><td><b>" + esc(u.name) + "</b></td><td>" + esc(u.display) + "</td><td>" + (isAdmin ? "管理员" : "成员") +
-      "</td><td>" + (active ? "启用" : "停用") + "</td><td>" + esc(u.created) + "</td><td>" + ops + "</td></tr>";
+    html += "<tr><td><b>" + esc(u.name) + "</b></td><td>" + esc(u.display) + "</td><td>" + (ROLE_ZH2[u.role] || u.role) +
+      "</td><td>" + (pending ? '<span class="tag">待审核</span>' : (active ? "启用" : "停用")) + "</td><td>" + esc(u.created) + "</td><td>" + ops + "</td></tr>";
   }
   html += "</table>";
   box.innerHTML = html;
@@ -1866,15 +2040,16 @@ function bindAccountOps() {
     const b = ev.target.closest("button[data-ac]");
     if (!b) return;
     const name = b.dataset.name, ac = b.dataset.ac;
+    const ROLE_ZH3 = { admin: "管理员", teacher: "导师", member: "学生" };
     if (ac === "role") {
-      const to = b.textContent.indexOf("设为管理员") >= 0 ? "admin" : "member";
+      const to = b.dataset.role || "member";
       const r = await post("auth", { action: "update", name, role: to });
-      setStatus("ac-status", r.ok ? ("已将 " + name + " 设为 " + to) : r.error, r.ok ? "ok" : "err");
+      setStatus("ac-status", r.ok ? ("已将 " + name + " 设为 " + (ROLE_ZH3[to] || to)) : r.error, r.ok ? "ok" : "err");
       loadAccounts();
     } else if (ac === "toggle") {
-      const active = b.textContent.indexOf("启用") >= 0;
+      const active = b.dataset.active === "true";
       const r = await post("auth", { action: "update", name, active });
-      setStatus("ac-status", r.ok ? (name + (active ? " 已启用" : " 已停用")) : r.error, r.ok ? "ok" : "err");
+      setStatus("ac-status", r.ok ? (name + (active ? " 已启用（审核通过）" : " 已停用")) : r.error, r.ok ? "ok" : "err");
       loadAccounts();
     } else if (ac === "pwd") {
       const np = prompt("为 " + name + " 设置新密码（≥6 位）：");

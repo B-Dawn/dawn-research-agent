@@ -51,6 +51,7 @@ ADMIN_ONLY_APIS = ("model_set",)
 
 STATIC_DIR = HERE
 INDEX_FILE = os.path.join(STATIC_DIR, "index.html")
+APP_VERSION = "0.8.0"  # 版本号唯一来源：改这里，页面（标题/登录页/侧栏）自动同步
 APPJS_FILE = os.path.join(STATIC_DIR, "app.js")
 
 
@@ -302,8 +303,16 @@ def api_auth(params):
             return {"ok": False, "error": "请先登录"}
         return auth.self_update({**params, "_name": user.get("name", "")})
     if action == "directory":
-        # 任何登录用户可看的用户目录（仅公开字段，用于合作对接）
-        return {"ok": True, "users": auth.list_users()}
+        # 用户目录按角色过滤（仅公开字段）：导师=其他导师+全部学生；学生=仅导师；管理员=全部
+        if not user:
+            return {"ok": False, "need_login": True, "error": "请先登录"}
+        role = user.get("role")
+        users = auth.list_users()
+        if role == "teacher":
+            users = [u for u in users if u["name"] != user["name"] and u.get("role") in ("teacher", "member")]
+        elif role == "member":
+            users = [u for u in users if u.get("role") == "teacher" and u.get("active", True)]
+        return {"ok": True, "users": users}
     # ---- 以下需要管理员权限 ----
     if not user or user.get("role") != "admin":
         return {"ok": False, "error": "需要管理员权限（当前：%s）"
@@ -814,6 +823,69 @@ def api_review(params):
         return {"ok": True, "reviews": wb.rev_list()}
     if action == "remove":
         return wb.rev_remove(params.get("id"))
+    return {"ok": False, "error": "未知操作 %s" % action}
+
+
+def api_format(params):
+    """论文格式检查：规则版（离线）+ 自定义模板 + 可选 AI 补充 + 文件上传。"""
+    action = params.get("action") or "check"
+    if action == "upload_doc":
+        import base64 as _b64, io as _io, zipfile as _zf
+        data_b64 = (params.get("data_b64") or "").strip()
+        kind = params.get("kind") or "paper"
+        fname = (params.get("filename") or "").lower()
+        if not data_b64:
+            return {"ok": False, "error": "未收到文件"}
+        try:
+            raw = _b64.b64decode(data_b64)
+        except Exception as e:
+            return {"ok": False, "error": "文件解码失败：%s" % e}
+        text = ""
+        if fname.endswith(".docx"):
+            try:
+                z = _zf.ZipFile(_io.BytesIO(raw))
+                xml = z.read("word/document.xml").decode("utf-8", errors="ignore")
+                paras = []
+                for pm in re.findall(r"<w:p[ >].*?</w:p>", xml, re.S):
+                    seg = "".join(re.findall(r"<w:t[^>]*>(.*?)</w:t>", pm, re.S))
+                    seg = seg.replace("&amp;", "&").strip()
+                    if seg:
+                        paras.append(seg)
+                text = "\n".join(paras)
+            except Exception as e:
+                return {"ok": False, "error": "docx 解析失败：%s" % e}
+        else:
+            text = raw.decode("utf-8", errors="ignore")
+        if kind == "paper":
+            if len(text.strip()) < 100:
+                return {"ok": False, "error": "论文文本太短（≥100 字），请确认上传了正确的论文文件"}
+            return {"ok": True, "text": text[:300000], "chars": len(text)}
+        # 论文要求 → 必需章节清单
+        items = []
+        if fname.endswith(".json"):
+            try:
+                j = json.loads(text)
+                items = [str(x).strip() for x in (j.get("items") or j) if str(x).strip()]
+            except Exception:
+                items = []
+        if not items:
+            items = [ln.strip() for ln in text.splitlines() if ln.strip()]
+        items = items[:60]
+        if len(items) < 3:
+            return {"ok": False, "error": "论文要求太少（至少 3 条章节/要素），请确认上传了要求文件"}
+        ptype = params.get("ptype") if params.get("ptype") in wb.FT_TYPES else "thesis"
+        sv = wb.ft_template_save(ptype, "\n".join(items))
+        if not sv.get("ok"):
+            return sv
+        return {"ok": True, "items": items, "ptype": ptype, "saved": True,
+                "note": "已按上传的要求文件保存为 %s 模板（%d 项）" % (wb.FT_TYPES.get(ptype, ptype), len(items))}
+    if action == "check":
+        return wb.ft_check(params.get("text"), params.get("ptype") or "journal",
+                           bool(params.get("ai")))
+    if action == "template_save":
+        return wb.ft_template_save(params.get("ptype"), params.get("text"))
+    if action == "template_get":
+        return wb.ft_template_get(params.get("ptype") or "journal")
     return {"ok": False, "error": "未知操作 %s" % action}
 
 
@@ -1666,6 +1738,7 @@ API_MAP = {
     "reviewflow": api_reviewflow,
     "workflow": api_workflow,
     "dataset": api_dataset,
+    "format": api_format,
     "model_list": api_model_list,
 }
 
@@ -1681,9 +1754,12 @@ class Handler(BaseHTTPRequestHandler):
             return
         with open(path, "rb") as f:
             body = f.read()
+        if path == INDEX_FILE:
+            body = body.replace(b"__APP_VERSION__", APP_VERSION.encode())
         self.send_response(200)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-cache")  # 确保更新后浏览器立即拿到新代码
         self.end_headers()
         self.wfile.write(body)
 

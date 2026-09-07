@@ -39,6 +39,7 @@ _EMPTY = {
     "reviewflow": {"reviews": []},
     "workflow": {"users": {}},
     "custom_skills": {"skills": []},
+    "format_templates": {"templates": {}},
 }
 
 
@@ -105,7 +106,7 @@ def _uid(prefix, items):
 WRITE_KINDS = {"outline": "论文大纲", "draft": "章节初稿", "polish": "学术润色",
                "cover": "投稿信 Cover Letter", "response": "审稿回复",
                "algo": "算法代码", "trainplan": "训练方案", "paper": "论文初稿",
-               "check": "算法校验报告"}
+               "check": "算法校验报告", "dup": "降重改写"}
 
 _PROMPTS = {
     "outline": (
@@ -642,12 +643,15 @@ MP_STATUS = {"planning": "规划中", "writing": "撰写中", "submitted": "已�
 MP_FIELDS = ("title", "ptype", "target_journal", "deadline", "notes", "status")
 
 
+MP_CAPS = {"title": 200, "ptype": 20, "target_journal": 120, "deadline": 20, "notes": 4000, "status": 20}
+
+
 def mp_add(owner, data):
     title = (data.get("title") or "").strip()
     if not title:
         return {"ok": False, "error": "论文标题不能为空"}
     def fn(obj):
-        p = {k: (data.get(k) or "").strip() for k in MP_FIELDS}
+        p = {k: (data.get(k) or "").strip()[:MP_CAPS.get(k, 200)] for k in MP_FIELDS}
         p["status"] = p["status"] if p["status"] in MP_STATUS else "writing"
         p["ptype"] = p["ptype"] or "期刊论文"
         p["id"] = _uid("p", obj.get("papers", []))
@@ -671,7 +675,7 @@ def mp_update(mid, owner, patch):
             if p.get("id") == mid and p.get("owner") == owner:
                 for k in MP_FIELDS:
                     if patch.get(k) is not None:
-                        v = str(patch[k]).strip()
+                        v = str(patch[k]).strip()[:MP_CAPS.get(k, 200)]
                         if v or k in ("deadline", "notes", "target_journal"):
                             p[k] = v
                 if p.get("status") not in MP_STATUS:
@@ -873,6 +877,41 @@ SKILLS = {
         "tab": "chat",
         "prompt": ("你是文献雷达（中文）。用户给一个方向；输出：①今日最值得关注的 8 篇论文清单（必须标注：以下条目为候选框架，"
                    "请用系统「文献检索」验证真实存在后再入库——AI 不直接生成可信条目）；②研究脉络总结；③可深化的 3 个方向。")},
+    "paraphrase_dup": {
+        "name": "降重 · 查重版",
+        "desc": "中文学术降重：句式重构+同义替换+语态转换，确保无连续八字与原文相同；术语/引用/数据/公式原样保留。（融合 GitHub otisgodwin92 降重指令与 ECNU-ICALK/AutoSkill 反模式）",
+        "tab": "mypaper",
+        "prompt": ("你是中文学术论文降重专家（灵感来源：GitHub otisgodwin92 论文降重指令、ECNU-ICALK/AutoSkill academic_paraphrasing_expansion）。"
+                   "对用户给出的中文学术文本做深度改写以降低查重率。核心规则："
+                   "①改写后不得出现与原文连续八字相同的片段；②句式重构为主（主被动转换、拆分/合并长句、调整语序），同义替换为辅（如：采用→运用/选用、基于→立足于/在…基础上、通过→借助/凭借、提升→实现…的提高）；"
+                   "③动词短语可适度扩展（管理→开展…的管理工作）、括号内解释性信息可用'也就是/具体而言'融入句子；④可使用把字句/被字句、适当增加连接词使表达更自然；"
+                   "⑤硬性保真：专业术语、英文缩写、数字、单位、公式、引用标注（如[1]）一律原样保留，不增删任何事实信息；"
+                   "⑥禁止：直接照抄原句、纯同义词交换而不改结构、使用第一人称、过度口语化、降低学术语域、缩写或概括原文（改写后字数应与原文相当）；"
+                   "⑦只输出改写后的文本本身，不要任何解释、前言或对比说明。")},
+    "paraphrase_aigc": {
+        "name": "降重 · 降AI率版",
+        "desc": "针对 AIGC 检测（知网等）：打破句式节奏/信息密度/术语位置/连接词/模板结构五大标记，术语主宾换位；事实数据引用严格保真。（灵感来源：GitHub cnki-aigc-skill）",
+        "tab": "mypaper",
+        "prompt": ("你是学术文本 AIGC 检测优化专家（灵感来源：GitHub cnki-aigc-skill 的五维改写框架）。"
+                   "目标：降低文本被 AI 检测系统（知网 AIGC 等）标记的概率，同时严格保真。"
+                   "针对五大检测标记逐条处理：①句式节奏——打散均匀的'主谓宾'节奏，长短句交错，个别句子用把字句/被字句或条件句改写；"
+                   "②信息密度——把高度凝练的句子适度展开解释（一句话拆成'结论+解释'两步说），避免每句信息量完全均等；"
+                   "③术语位置——把术语从主语位置移到宾语或话题位置（如'本框架实现监控'→'在监控层面，本框架…'）；"
+                   "④连接词——替换高频模板连接词（此外→另外/与此同时/值得一提的是；因此→正因如此/由此），并允许部分句子省略连接词；"
+                   "⑤模板结构——避免连续段落使用相同的展开模板，改用举例、补充说明、设问后自答等人类惯用展开方式。"
+                   "硬性保真：事实、数字、公式、引用标注、专业术语原样保留，不增删观点，不缩写内容；避免过度口语化与第一人称；字数与原文相当。"
+                   "输出末尾附一段'高风险特征修改清单'（列出你改动的 3-5 处及对应手法）。正文与清单之间用一行'---'分隔。")},
+    "paraphrase_en": {
+        "name": "降重 · 英文改写版",
+        "desc": "英文 academic paraphrasing：0% plagiarism 导向，重构句式+高级词汇替换，字数不减、意义/引用/术语完整。（移植 GitHub ECNU-ICALK/AutoSkill academic_paraphrasing_expansion）",
+        "tab": "mypaper",
+        "prompt": ("You are an academic writing assistant specialized in paraphrasing to minimize plagiarism scores "
+                   "(adapted from GitHub ECNU-ICALK/AutoSkill 'academic_paraphrasing_expansion'). "
+                   "Rewrite the given English academic text: ①Completely restructure sentences and replace vocabulary with sophisticated alternatives; "
+                   "②Do NOT copy any phrase or sentence directly from the input; ③Do not reduce the word count - output must be equal or longer; never summarize or condense; "
+                   "④Preserve meaning, facts, citations ([n] markers), and technical terms exactly; ⑤Keep professional academic register - avoid rare/awkward word combinations that look artificially complex; "
+                   "⑥Ensure smooth, natural, grammatically correct flow; ⑦Output ONLY the rewritten text, no explanations or comparisons. "
+                   "If the input is Chinese, translate-and-rewrite it into academic English instead.")},
     "html_slides": {
         "name": "HTML 汇报幻灯",
         "desc": "把论文/报告转成 HTML 幻灯（组会汇报用；现代做法是 HTML 而非 PPT）。",
@@ -912,7 +951,7 @@ def rf_list(by):
 
 
 def rf_create(by, name):
-    name = (name or "").strip()
+    name = (name or "").strip()[:60]
     if not name:
         return {"ok": False, "error": "文件夹名不能为空"}
     def fn(obj):
@@ -1303,3 +1342,123 @@ def cs_remove(by, cid):
         return obj
     _mutate("custom_skills", fn)
     return {"ok": True}
+
+
+# ================================================================ 15. 论文格式检查器（规则版 + 模板）
+FT_TYPES = {"journal": "期刊论文", "thesis": "本科毕业论文"}
+FT_DEFAULT_STRUCT = {
+    "journal": ["摘要", "关键词", "引言", "结论", "参考文献"],
+    "thesis": ["摘要", "关键词", "Abstract", "目录", "绪论", "结论", "参考文献", "致谢"],
+}
+
+
+def ft_templates():
+    return _load("format_templates").get("templates", {})
+
+
+def ft_template_save(ptype, text):
+    if ptype not in FT_TYPES:
+        return {"ok": False, "error": "未知论文类型"}
+    lines = [ln.strip() for ln in (text or "").splitlines() if ln.strip()]
+    if len(lines) < 3:
+        return {"ok": False, "error": "模板要求至少 3 行（每行一个必需章节/要素）"}
+    def fn(obj):
+        obj.setdefault("templates", {})[ptype] = {
+            "items": lines[:60], "ts": _now()}
+        return obj
+    _mutate("format_templates", fn)
+    return {"ok": True, "count": len(lines[:60])}
+
+
+def ft_template_get(ptype):
+    t = ft_templates().get(ptype)
+    if not t:
+        return {"ok": True, "items": FT_DEFAULT_STRUCT.get(ptype, []), "default": True}
+    return {"ok": True, "items": t.get("items", []), "default": False, "ts": t.get("ts", "")}
+
+
+def ft_check(text, ptype="journal", ai=False):
+    """规则版格式检查：结构 / 参考文献编号 / 图表标号 / 标点 / 段落。"""
+    text = (text or "").strip()
+    if len(text) < 100:
+        return {"ok": False, "error": "请粘贴论文全文或较长章节（≥100 字）"}
+    if ptype not in FT_TYPES:
+        return {"ok": False, "error": "未知论文类型"}
+    problems, good = [], []
+    norm = re.sub(r"[ \t]+", " ", text)
+
+    # 1) 结构完整性（模板优先，否则内置）；忽略全部空白，兼容"摘 要"等写法
+    tpl = ft_template_get(ptype)
+    required = tpl.get("items") or FT_DEFAULT_STRUCT.get(ptype, [])
+    flat = re.sub(r"\s+", "", text)
+    miss = [k for k in required if k.replace(" ", "").lower() not in flat.lower()]
+    if miss:
+        problems.append("**缺少必需章节/要素**（%s）：%s" % (
+            "模板" if not tpl.get("default") else "内置标准", "、".join(miss[:12])))
+    else:
+        good.append("必需章节/要素齐全（%d/%d）" % (len(required), len(required)))
+
+    # 2) 参考文献编号连续性：[1] [2] ... 应从 1 递增且无断号
+    refs = [int(m) for m in re.findall(r"\[(\d{1,3})\]", text)]
+    if refs:
+        seq = sorted(set(x for x in refs if x <= 200))
+        gaps = [i for i in range(1, max(seq) + 1) if i not in seq] if seq else []
+        if gaps:
+            problems.append("**参考文献编号断号**：缺少 %s（正文中出现编号 %s）"
+                            % (gaps[:10], "…" if len(seq) > 12 else seq))
+        else:
+            good.append("参考文献编号连续（[1]–[%d]）" % max(seq))
+        # 引用从未出现在文末列表（粗查：引用数 vs 列表条目数）
+
+    # 3) 图表标号：定义（图1/图 1）与引用配对
+    figs = set(int(m) for m in re.findall(r"图\s*(\d{1,2})", text))
+    tabs = set(int(m) for m in re.findall(r"表\s*(\d{1,2})", text))
+    orphan_figs = [f for f in sorted(figs) if not re.search(r"如[图图]\s*%d|[如见如图]\s*%d" % (f, f), text)]
+    if len(figs) > 1 and orphan_figs:
+        problems.append("**图片编号疑似未在正文引用**：图 %s（检查是否有“如图X所示”）" % orphan_figs[:8])
+    elif figs:
+        good.append("图片编号出现 %d 个（图 %s）" % (len(figs), sorted(figs)[:8]))
+    if len(tabs) > 1:
+        good.append("表格编号出现 %d 个（表 %s）" % (len(tabs), sorted(tabs)[:8]))
+
+    # 4) 中英文标点混用：中文句子里出现半角逗号/句号
+    cn_half = re.findall(r"[\u4e00-\u9fff] [,.] [\u4e00-\u9fff]|[\u4e00-\u9fff][,.][\u4e00-\u9fff]", text)
+    if cn_half:
+        problems.append("**疑似中英文标点混用** %d 处（中文语句中出现半角 ',' '.' ，建议改全角'，''。'；代码/公式除外）" % len(cn_half))
+    # 全角引号/括号一致性粗查
+    if text.count("（") != text.count("）"):
+        problems.append("**全角括号不配对**：%d 个'（' vs %d 个'）'" % (text.count("（"), text.count("）")))
+
+    # 5) 段落长度：超长段落（>800 字）提示分节
+    paras = [p for p in re.split(r"\n\s*\n", text) if p.strip()]
+    long_ps = [i + 1 for i, p in enumerate(paras) if len(p) > 800]
+    if long_ps:
+        problems.append("**超长段落**：第 %s 段超过 800 字，建议按要点拆分" % long_ps[:5])
+    if paras:
+        good.append("共 %d 个自然段，平均 %.0f 字/段" % (len(paras), len(text) / len(paras)))
+
+    md = ["# 格式检查报告 · %s" % FT_TYPES.get(ptype, ptype), ""]
+    md.append("> 模板来源：%s" % ("你的自定义模板" if not tpl.get("default") else "内置标准结构"))
+    md.append("")
+    md.append("**发现 %d 个问题，%d 项通过。**" % (len(problems), len(good))) if (problems or good) else None
+    if problems:
+        md += ["", "## 需要处理", ""] + ["- " + x for x in problems]
+    if good:
+        md += ["", "## 已通过", ""] + ["- " + x for x in good]
+    if not problems:
+        md += ["", "🎉 未发现规则层面的格式问题。注意：字体/行距/页边距等排版细节在 Word 层面，本工具检查的是文本结构。"]
+    md += ["", "> 排版类要求（字体/行距/页边距/页码）属于 Word 模板层面，导入 Word 前请套用学校模板。"]
+
+    out = {"ok": True, "problems": len(problems), "pass": len(good), "markdown": "\n".join(md)}
+    if ai and model.status()["ok"]:
+        try:
+            reply = model.quick_ask(
+                "以下是一篇%s的格式检查报告与论文节选。请从学术写作规范角度补充 3-5 条报告未覆盖的格式/表达问题"
+                "（标题层级、术语一致性、时态、引用格式等），只依据给定文本，不编造：\n\n%s\n\n%s"
+                % (FT_TYPES.get(ptype, ptype), "\n".join(md)[:2500], text[:6000]),
+                system="你是论文格式审查助理：只谈格式与表达规范，不评价学术内容；不编造。", max_tokens=900, temperature=0.3)
+            out["ai_md"] = reply[:4000]
+            out["markdown"] += "\n\n## AI 深度检查（补充）\n\n" + out["ai_md"]
+        except Exception as e:
+            out["ai_error"] = str(e)
+    return out
