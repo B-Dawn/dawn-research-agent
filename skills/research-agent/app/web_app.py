@@ -996,7 +996,7 @@ def api_reffolder(params):
         return wb.rf_patch_paper(params.get("id"), by, params.get("title"),
                                   abstract=params.get("abstract"))
     if action == "fetch_abstract":
-        return wb.rf_fetch_abstract(params.get("title"))
+        return wb.rf_fetch_abstract(params.get("title"), params.get("link") or "")
     if action == "synthesize":
         return wb.rf_synthesize(params.get("id"), by)
     return {"ok": True, "folders": wb.rf_list(by)}

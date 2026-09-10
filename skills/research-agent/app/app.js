@@ -1184,10 +1184,10 @@ $("rf-del").addEventListener("click", async () => {
 });
 // ---- 自动补齐文献摘要（走后端，避免浏览器 CORS 限制） ----
 const _absCache = {};  // title → abstract (内存缓存，本次会话有效)
-async function fetchAbstract(title) {
+async function fetchAbstract(title, link) {
   if (_absCache[title] !== undefined) return _absCache[title];
   try {
-    const r = await post("reffolder", { action: "fetch_abstract", title });
+    const r = await post("reffolder", { action: "fetch_abstract", title, link: link || "" });
     const abs = (r && r.ok && r.abstract) ? r.abstract : "";
     _absCache[title] = abs;
     return abs;
@@ -1228,7 +1228,7 @@ $("rf-digest").addEventListener("click", async () => {
     // 摘要不足时自动从外部数据源补齐
     if (text.length < 100 && p.title) {
       setStatus("rf-status", "第 " + (i + 1) + "/" + ps.length + " 篇 · 自动补齐摘要…");
-      const fetched = await fetchAbstract(p.title);
+      const fetched = await fetchAbstract(p.title, p.link);
       if (fetched) {
         text = (p.title + ". " + (p.venue || "") + " " + (p.year || "") + ". " + fetched).trim();
         // 回写摘要到文献记录（持久化）
@@ -1278,7 +1278,7 @@ $("rf-fillabs").addEventListener("click", async () => {
   for (let i = 0; i < missing.length; i++) {
     const p = missing[i];
     setStatus("rf-status", "补齐摘要 " + (i + 1) + "/" + missing.length + "：" + (p.title || "").slice(0, 30) + "…");
-    const r = await post("reffolder", { action: "fetch_abstract", title: p.title });
+    const r = await post("reffolder", { action: "fetch_abstract", title: p.title, link: p.link });
     if (r && r.ok && r.abstract) {
       const w = await post("reffolder", { action: "patch_paper", id: f.id, title: p.title, abstract: r.abstract });
       if (w && w.ok) { okN++; _absCache[p.title] = r.abstract; } else { failN++; }

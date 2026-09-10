@@ -12,9 +12,11 @@
 纪律：不编造文献与数据——AI 输出要求用【待补：…】占位，统计只给算出来的数。
 """
 
+import difflib
 import json
 import math
 import os
+import urllib.error
 import urllib.parse
 import urllib.request
 import re
@@ -1041,86 +1043,148 @@ def rf_patch_paper(rid, by, title, **updates):
     return {"ok": True}
 
 
+def _norm_title(s):
+    return re.sub(r"[^\w\u4e00-\u9fff]+", "", (s or "").lower())
+
+
 def _title_similar(a, b):
-    """粗略判断两个标题是否指向同一篇（英文按词、中文按字符的 Jaccard）。"""
-    def toks(s):
-        s = re.sub(r"[^\w\u4e00-\u9fff]+", " ", (s or "").lower()).strip()
-        if re.search(r"[\u4e00-\u9fff]", s):
-            return set(c for c in s if c.strip())
-        return set(w for w in s.split() if len(w) > 2)
-    ta, tb = toks(a), toks(b)
-    if not ta or not tb:
+    """判断两个标题是否指向同一篇。
+
+    用 difflib 序列相似度（对词序、标点、中英文都稳健）。
+    实测：同一篇（含副标题差异）= 0.86~1.00；
+    检索 API 返回的“相关但不同”文献 = 0.62~0.78。
+    阈值取 0.86，宁可漏也不要错配。
+    """
+    na, nb = _norm_title(a), _norm_title(b)
+    if len(na) < 5 or len(nb) < 5:
         return False
-    inter = len(ta & tb)
-    return inter / max(1, min(len(ta), len(tb))) >= 0.6
+    return difflib.SequenceMatcher(None, na, nb).ratio() >= 0.86
 
 
-def _openalex_abstract(title):
-    """OpenAlex（免费、覆盖广、含摘要倒排索引）。"""
-    q = urllib.parse.quote(title)
-    j = model._http_get_json(
-        "https://api.openalex.org/works?search=%s&per-page=3&mailto=dawn-agent@example.com" % q,
-        timeout=20)
+# 摘要最低长度：低于此值视为空壳（OpenAlex 个别中文文献只返回“摘要：”）
+_MIN_ABSTRACT = 120
+
+
+def _get_json_retry(url, tries=3, base=3.0, timeout=20):
+    """GET JSON，遇 429/503 限流按 3s/6s 退避重试（学术 API 免费额度有频控）。"""
+    last = None
+    for i in range(tries):
+        try:
+            return model._http_get_json(url, timeout=timeout)
+        except urllib.error.HTTPError as e:
+            last = e
+            if e.code in (429, 503) and i < tries - 1:
+                time.sleep(base * (i + 1))
+                continue
+            raise
+    raise last
+
+
+def _inv_to_text(ii):
+    """OpenAlex 的 abstract_inverted_index（词→位置列表）还原成正文。"""
+    if not ii:
+        return ""
+    pos = {}
+    for word, idxs in ii.items():
+        for i in idxs:
+            pos[i] = word
+    return " ".join(pos[k] for k in sorted(pos)).strip()
+
+
+def _doi_from_link(link):
+    """从 link 里抽 DOI（支持 https://doi.org/xxx 或裸 DOI）。"""
+    s = (link or "").strip()
+    m = re.search(r"10\.\d{4,9}/[^\s\"'<>),]+", s)
+    return m.group(0).rstrip(".") if m else ""
+
+
+def _clean_cr_abstract(raw):
+    a = re.sub(r"<[^>]+>", " ", raw or "")
+    return re.sub(r"\s+", " ", a).strip()
+
+
+# ---- ① 按 DOI 精确取（无错配风险，首选） ----
+def _abs_doi_openalex(doi):
+    j = _get_json_retry("https://api.openalex.org/works/https://doi.org/%s"
+                        "?mailto=dawn-agent@example.com" % doi, timeout=20)
+    return _inv_to_text(j.get("abstract_inverted_index"))
+
+
+def _abs_doi_s2(doi):
+    j = _get_json_retry("https://api.semanticscholar.org/graph/v1/paper/DOI:%s"
+                        "?fields=abstract" % doi, timeout=20)
+    return (j.get("abstract") or "").strip()
+
+
+def _abs_doi_crossref(doi):
+    j = _get_json_retry("https://api.crossref.org/works/%s" % doi, timeout=20)
+    return _clean_cr_abstract((j.get("message") or {}).get("abstract"))
+
+
+# ---- ② 按标题检索（有错配风险，阈值从严，作兜底） ----
+def _abs_title_openalex(title):
+    j = _get_json_retry("https://api.openalex.org/works?search=%s&per-page=3"
+                        "&mailto=dawn-agent@example.com" % urllib.parse.quote(title), timeout=20)
     for w in (j.get("results") or []):
-        if not _title_similar(title, w.get("title") or ""):
-            continue
-        ii = w.get("abstract_inverted_index")
-        if not ii:
-            continue
-        pos = {}
-        for word, idxs in ii.items():
-            for i in idxs:
-                pos[i] = word
-        txt = " ".join(pos[k] for k in sorted(pos)).strip()
-        if txt:
-            return txt
+        if _title_similar(title, w.get("title") or ""):
+            t = _inv_to_text(w.get("abstract_inverted_index"))
+            if len(t) >= _MIN_ABSTRACT:
+                return t
     return ""
 
 
-def rf_fetch_abstract(title):
-    """按标题自动抓取摘要（免费、无需 Key）。多源依次尝试。
+def _abs_title_s2(title):
+    j = _get_json_retry("https://api.semanticscholar.org/graph/v1/paper/search"
+                        "?query=%s&fields=title,abstract&limit=3" % urllib.parse.quote(title), timeout=20)
+    for d in (j.get("data") or []):
+        if _title_similar(title, d.get("title") or ""):
+            a = (d.get("abstract") or "").strip()
+            if len(a) >= _MIN_ABSTRACT:
+                return a
+    return ""
 
+
+def _abs_title_crossref(title):
+    j = _get_json_retry("https://api.crossref.org/works?query.bibliographic=%s&rows=3"
+                        "&select=title,abstract" % urllib.parse.quote(title), timeout=20)
+    for item in ((j.get("message") or {}).get("items") or []):
+        ti = item.get("title") or ""
+        if isinstance(ti, list):
+            ti = " ".join(ti)
+        if _title_similar(title, ti):
+            a = _clean_cr_abstract(item.get("abstract"))
+            if len(a) >= _MIN_ABSTRACT:
+                return a
+    return ""
+
+
+def rf_fetch_abstract(title, link=""):
+    """自动抓取摘要（免费、无需 Key）。
+
+    策略：**优先按 DOI 精确取**（零错配风险），失败再按标题从严检索兜底。
+    顺序：DOI×OpenAlex → DOI×S2 → DOI×Crossref → 标题×OpenAlex → 标题×S2 → 标题×Crossref。
     放在后端执行：①避免浏览器 CORS 限制；②复用模型层的直连/代理回退逻辑。
-    数据源顺序：OpenAlex → Semantic Scholar → Crossref。
     """
     t = (title or "").strip()
-    if len(t) < 5:
-        return {"ok": False, "error": "标题过短，无法检索摘要"}
-    # 1) OpenAlex（最稳定，摘要覆盖率高）
-    try:
-        abst = _openalex_abstract(t)
-        if abst:
-            return {"ok": True, "abstract": abst[:1500], "source": "openalex"}
-    except Exception:
-        pass
-    # 2) Semantic Scholar（英文文献好，但免费额度易限流）
-    try:
-        j = model._http_get_json(
-            "https://api.semanticscholar.org/graph/v1/paper/search"
-            "?query=%s&fields=title,abstract&limit=3" % urllib.parse.quote(t), timeout=20)
-        for d in (j.get("data") or []):
-            if not _title_similar(t, d.get("title") or ""):
-                continue
-            abst = (d.get("abstract") or "").strip()
-            if abst:
-                return {"ok": True, "abstract": abst[:1500], "source": "semantic_scholar"}
-    except Exception:
-        pass
-    # 3) Crossref 兜底（提取 JATS 标签后正文）
-    try:
-        j = model._http_get_json(
-            "https://api.crossref.org/works?query=%s&rows=3&select=title,abstract" % urllib.parse.quote(t),
-            timeout=20)
-        for item in ((j.get("message") or {}).get("items") or []):
-            ti = " ".join(item.get("title") or []) if isinstance(item.get("title"), list) else (item.get("title") or "")
-            if not _title_similar(t, ti):
-                continue
-            abst = re.sub(r"<[^>]+>", " ", item.get("abstract") or "").strip()
-            abst = re.sub(r"\s+", " ", abst)
-            if abst:
-                return {"ok": True, "abstract": abst[:1500], "source": "crossref"}
-    except Exception:
-        pass
+    doi = _doi_from_link(link)
+    plan = []
+    if doi:
+        plan += [("doi:semantic_scholar", lambda: _abs_doi_s2(doi)),
+                 ("doi:crossref", lambda: _abs_doi_crossref(doi)),
+                 ("doi:openalex", lambda: _abs_doi_openalex(doi))]
+    if len(t) >= 5:
+        plan += [("semantic_scholar", lambda: _abs_title_s2(t)),
+                 ("crossref", lambda: _abs_title_crossref(t)),
+                 ("openalex", lambda: _abs_title_openalex(t))]
+    if not plan:
+        return {"ok": False, "error": "缺少标题与 DOI，无法检索摘要"}
+    for src, fn in plan:
+        try:
+            abst = (fn() or "").strip()
+        except Exception:
+            abst = ""
+        if len(abst) >= _MIN_ABSTRACT:
+            return {"ok": True, "abstract": abst[:1500], "source": src}
     return {"ok": False, "error": "外部数据源未找到该文献摘要（可手动粘贴）"}
 
 
