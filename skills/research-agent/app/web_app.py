@@ -783,7 +783,7 @@ def api_write(params):
         if not r.get("ok") and r.get("ai") is False:
             return {"ok": False, "ai": False,
                     "error": (r.get("reason") or r.get("error") or "模型不可用") +
-                             "\n\n> 到「设置 → 模型设置」选预设（默认腾讯混元）填 API Key，或装本地 Ollama。"}
+                             "\n\n> 到「模型与API」选预设（默认腾讯混元）填 API Key，或装本地 Ollama。"}
         return r
     if action == "save":
         return wb.docs_save(params.get("kind"), params.get("title"),
@@ -1024,7 +1024,7 @@ def api_workflow(params):
     if action == "from_resume":
         if not model.status()["ok"]:
             return {"ok": False, "ai": False,
-                    "error": "工作流启动需要模型。去「设置 → 模型设置」选预设并填 API Key。"}
+                    "error": "工作流启动需要模型。去「模型与API」选预设并填 API Key。"}
         text = (params.get("text") or "").strip()
         if len(text) < 30:
             return {"ok": False, "error": "请把简历/擅长技术/想要的方向描述得更充分一些（≥30 字）"}
@@ -1553,7 +1553,7 @@ def api_chat(params):
             if not r.get("ok"):
                 return {"ok": True, "reply": "深度推荐需要先配置模型：\n\n" +
                         (r.get("reason") or r.get("error") or "") +
-                        "\n\n> 到「设置 → 模型设置」选「腾讯混元」预设并填写 OpenAI 兼容 API（api_key/model，base_url 自动填好）或安装本地 Ollama。",
+                        "\n\n> 到「模型与API」选「腾讯混元」预设并填写 OpenAI 兼容 API（api_key/model，base_url 自动填好）或安装本地 Ollama。",
                         "module": "ai"}
             return {"ok": True, "reply": r["reply"] +
                     "\n\n---\n\n**附：规则引擎候选（AI 判断依据）**\n\n" + r["rule_md"],
@@ -1697,7 +1697,7 @@ def api_chat(params):
         if ar.get("ok"):
             return {"ok": True, "reply": "（AI 回答）\n\n" + ar["reply"], "module": "ask", "ai": True}
     return {"ok": True, "reply": "这句话我没听懂是要做哪件事。\n\n" + HELP_TEXT +
-            "\n\n> 提示：在「设置 → 模型设置」配置一个模型（默认腾讯混元，填 API Key 即可）后，"
+            "\n\n> 提示：在「模型与API」配置一个模型（默认腾讯混元，填 API Key 即可）后，"
             "我可以直接回答你的科研问题、诊断画像、深度推荐方向，而不只做命令检索。",
             "module": "help"}
 

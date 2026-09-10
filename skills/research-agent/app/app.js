@@ -137,7 +137,7 @@ function enterApp() {
   // 模型未配置时给一次提示
   post("model_status", {}).then(r => {
     if (r && r.ok === false && !r.need_login) {
-      addAgent("> **提示**：模型尚未配置（默认腾讯混元，需填 API Key）。去「设置 → 模型设置」选「腾讯混元」预设并粘贴 Key，"
+      addAgent("> **提示**：模型尚未配置（默认腾讯混元，需填 API Key）。去「模型与API」选「腾讯混元」预设并粘贴 Key，"
         + "或安装本地 Ollama 后，我才能**诊断画像、AI 深度推荐方向、自由回答科研问题**（不再只做命令检索）。");
     }
   });
@@ -209,11 +209,12 @@ const TITLES = {
   format: ["论文格式检查", "结构完整性 / 参考文献编号 / 图表标号 / 标点 / 段落规则检查；支持本科毕业论文与期刊论文，可按你的模板自定义必需章节。"],
   digest: ["论文精读", "粘贴论文文本：技术点分析 / 创新点总结 / 可行性分析 / 空白研究分析 / 中英翻译；只依据文本不编造。"],
   recommend: ["方向推荐", "技能×方向交叉检索按复用度/热度/数据/时间打分（规则版），或用 AI 深度推荐（需配置模型）。"],
-  profile: ["科研画像", "自主输入研究方向/创新点/约束，AI 才能据此诊断画像、驱动方向推荐（模型配置已移到「设置」）。"],
+  profile: ["科研画像", "自主输入研究方向/创新点/约束，AI 才能据此诊断画像、驱动方向推荐（模型配置已移到「模型与API」）。"],
   write: ["写作综述", "AI 写作助手（大纲/初稿/润色/投稿信/审稿回复）+ 文献综述工作台 + 草稿库；不编造文献与数据。"],
   mypaper: ["我的论文", "个人论文台账（仅本人可见）+ 合作对接：向其他注册用户发起合作邀请，接受后互为合作者。"],
   memory: ["长期记忆", "记下你的知识/经验/约定，只属于当前账户；智能对话的 AI 问答会自动带上这些记忆。"],
-  settings: ["设置", "独立配置 AI 模型（默认腾讯混元，免费额度）与账户管理；登录/注册入口在左侧栏底部。"],
+  modelapi: ["模型与API", "配置 AI 模型（默认腾讯混元，免费额度）与 API 信息识别；AI 问答 / AI 诊断 / 方向推荐 均依赖此配置。"],
+  settings: ["设置", "个人信息、技能中心与账户管理；登录/注册入口在左侧栏底部。"],
 };
 function switchTab(tab) {
   if (!tab || !TITLES[tab]) return;  // 分组标题按钮等无 data-tab 的直接忽略
@@ -226,7 +227,7 @@ function switchTab(tab) {
   if (tab === "lab") { refreshExps(); refreshReps(); fillPartnerSelects(); }
   if (tab === "algo") { loadTpPapers(); listMine(); }
   if (tab === "profile") { fillProfileExtra(); loadDirection(); }
-  if (tab === "settings") { refreshModelStatus(); }
+  if (tab === "modelapi") { refreshModelStatus(); }
   if (tab === "write") { loadDocs(); loadRevs(); }
   if (tab === "format") { loadFtPapers(); loadFtTemplate(); }
   if (tab === "memory") { loadMems(); }
@@ -1509,10 +1510,10 @@ $("api-parse").addEventListener("click", () => {
   const km = t.match(/(?:api[\s_-]?key|密钥|令牌|key)\s*[:=：]\s*["']?([A-Za-z0-9_\-]{16,})/i)
           || t.match(/\b(sk-[A-Za-z0-9_\-]{8,})\b/);
   if (km) key = km[1];
-  const mm = t.match(/(?:model|模型)\s*[:=：]\s*["']?([A-Za-z0-9._\-\/]+)/i);
+  const mm = t.match(/(?:["']?model["']?|模型)\s*[:=：]\s*["']?([A-Za-z0-9._\-\/]+)/i);
   if (mm) model = mm[1];
   if (!model) {
-    const known = t.match(/\b(hunyuan-turbos-latest|hunyuan-[\w\-]+|deepseek-[\w\-]+|qwen[\w\-\.]*|gpt-[\w\-\.]+|glm-[\w\-]+|claude-[\w\-\.]+|llama[\w\-\.]*)\b/i);
+    const known = t.match(/\b(hunyuan-turbos-latest|hunyuan-[\w\.\-]+|deepseek-[\w\.\-]+|qwen[\w\.\-]*|gpt-[\w\.\-]+|glm-[\w\.\-]+|claude-[\w\.\-]+|llama[\w\.\-]*)\b/i);
     if (known) model = known[1];
   }
   if (!url && !key && !model) { setStatus("api-parse-status", "没有识别到 API 信息（端点/Key/模型名）。请检查粘贴内容格式。", "err"); return; }

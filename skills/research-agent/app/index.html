@@ -281,7 +281,8 @@
           <button data-tab="profile">科研画像</button>
           <button data-tab="recommend">方向推荐</button>
           <button data-tab="memory">长期记忆</button>
-          <button data-tab="settings">设置</button>
+          <button data-tab="modelapi">🔧 模型与API</button>
+          <button data-tab="settings">⚙️ 设置</button>
         </div>
       </div>
       <div class="nav-group" id="nav-admin" style="display:none">
@@ -812,6 +813,60 @@
     <!-- 设置 -->
     <section data-pane="settings" class="hidden">
       <div class="card">
+        <h3 style="margin-top:0">个人信息 <span style="font-weight:400;color:var(--muted);font-size:12px">（常规信息：显示名 / 邮箱 / 修改自己的密码）</span></h3>
+        <div class="row">
+          <div><label>用户名</label><input id="pi-name" disabled></div>
+          <div><label>显示名</label><input id="pi-display" placeholder="登录后展示的名字" maxlength="40"></div>
+          <div><label>邮箱</label><input id="pi-email" placeholder="选填" maxlength="80"></div>
+        </div>
+        <button class="run" id="pi-save">保存个人信息</button>
+        <span class="status" id="pi-status"></span>
+        <div class="row" style="margin-top:8px">
+          <div><label>旧密码</label><input id="pi-old" type="password" placeholder="修改密码需验证" maxlength="64"></div>
+          <div><label>新密码（≥6 位）</label><input id="pi-new" type="password" maxlength="64"></div>
+          <div><label>&nbsp;</label><button class="run ghost" id="pi-pwd" style="margin-top:0">修改密码</button></div>
+        </div>
+        <span class="status" id="pi-pwd-status"></span>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">技能管理 <span style="font-weight:400;color:var(--muted);font-size:12px">（选中技能用于删除与导出，可 Ctrl/Shift 多选；技能的运行在各功能模块内）</span></h3>
+        <div class="row">
+          <div style="flex:2"><label>技能列表（内置 + 自定义）</label>
+            <select id="sk-multi" multiple style="min-height:120px"></select></div>
+          <div style="flex:1">
+            <label>&nbsp;</label>
+            <button class="run ghost" id="sk-refresh" style="margin-top:0;width:100%">刷新技能</button>
+            <button class="run ghost danger" id="sk-del" style="margin-top:8px;width:100%">删除所选自定义技能</button>
+            <span class="status" id="sk-status"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">导入自定义技能 <span style="font-weight:400;color:var(--muted);font-size:12px">（.zip 自动解压注册包内技能 / .md/.txt 正文即提示词 / .json：{name,desc,prompt}）</span></h3>
+        <div class="row">
+          <div><label>技能文件</label>
+            <input type="file" id="sk-file" accept=".zip,.md,.txt,.json"></div>
+          <div style="flex:1"><label>技能名称（上传 .md/.txt 时用，可留空）</label><input id="sk-name" placeholder="可选" maxlength="40"></div>
+        </div>
+        <span class="status" id="sk-up-status"></span>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">导出技能 <span style="font-weight:400;color:var(--muted);font-size:12px">（在「技能管理」列表中选中要导出的技能，可多选，导出为 .zip 分享或备份）</span></h3>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="run" id="sk-export">导出所选技能（.zip）</button>
+          <span class="status" id="sk-exp-status"></span>
+        </div>
+      </div>
+
+
+    </section>
+
+    <!-- 模型与 API（独立标签页：模型设置 + API 信息识别） -->
+    <section data-pane="modelapi" class="hidden">
+      <div class="card">
         <h3 style="margin-top:0">模型设置 <span style="font-weight:400;color:var(--muted);font-size:12px">（全局设置，仅管理员可改；AI 问答 / AI 诊断 均依赖此配置）</span></h3>
         <div class="row">
           <div>
@@ -860,65 +915,14 @@
       </div>
 
       <div class="card">
-        <h3 style="margin-top:0">个人信息 <span style="font-weight:400;color:var(--muted);font-size:12px">（常规信息：显示名 / 邮箱 / 修改自己的密码）</span></h3>
-        <div class="row">
-          <div><label>用户名</label><input id="pi-name" disabled></div>
-          <div><label>显示名</label><input id="pi-display" placeholder="登录后展示的名字" maxlength="40"></div>
-          <div><label>邮箱</label><input id="pi-email" placeholder="选填" maxlength="80"></div>
-        </div>
-        <button class="run" id="pi-save">保存个人信息</button>
-        <span class="status" id="pi-status"></span>
-        <div class="row" style="margin-top:8px">
-          <div><label>旧密码</label><input id="pi-old" type="password" placeholder="修改密码需验证" maxlength="64"></div>
-          <div><label>新密码（≥6 位）</label><input id="pi-new" type="password" maxlength="64"></div>
-          <div><label>&nbsp;</label><button class="run ghost" id="pi-pwd" style="margin-top:0">修改密码</button></div>
-        </div>
-        <span class="status" id="pi-pwd-status"></span>
-      </div>
-
-      <div class="card">
-        <h3 style="margin-top:0">API 信息识别 <span style="font-weight:400;color:var(--muted);font-size:12px">（把服务商给的 API 信息整段粘贴到下面，自动识别 端点 / Key / 模型名 并填入上方「模型设置」）</span></h3>
-        <textarea id="api-paste" style="min-height:90px" placeholder="支持多种写法，例如：&#10;接口地址：https://api.xxx.com/v1&#10;API Key：sk-xxxxxxxxxxxxxxxx&#10;模型：deepseek-chat&#10;&#10;或直接粘贴整段开通邮件 / 文档说明。"></textarea>
+        <h3 style="margin-top:0">API 信息识别 <span style="font-weight:400;color:var(--muted);font-size:12px">（把服务商给的 API 信息整段粘贴到下面，自动识别 端点 / Key / 模型名 并填入本页「模型设置」）</span></h3>
+        <textarea id="api-paste" style="min-height:90px" placeholder="支持多种写法，例如：&#10;接口地址：https://api.xxx.com/v1&#10;API Key：sk-xxxxxxxxxxxxxxxx&#10;模型：deepseek-chat&#10;&#10;或直接粘贴整段开通邮件 / 文档 / curl 命令。"></textarea>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <button class="run" id="api-parse">识别并填入模型设置</button>
           <span class="status" id="api-parse-status"></span>
         </div>
-        <p style="color:var(--muted);font-size:12px;margin:8px 0 0">识别规则：端点（http(s) 链接，优先含 /v1）、Key（sk- 开头或 key/密钥/令牌 后的字符串）、模型名（model/模型 后的字符串，或已知模型名）。识别后请核对上方「模型设置」再点「保存配置」。</p>
+        <p style="color:var(--muted);font-size:12px;margin:8px 0 0">识别规则：端点（http(s) 链接，优先含 /v1）、Key（sk- 开头或 key/密钥/令牌 后的字符串）、模型名（"model"/模型 后的字符串，或已知模型名如 glm-5.3-flash）。识别后请核对本页「模型设置」再点「保存配置」。</p>
       </div>
-
-      <div class="card">
-        <h3 style="margin-top:0">技能管理 <span style="font-weight:400;color:var(--muted);font-size:12px">（选中技能用于删除与导出，可 Ctrl/Shift 多选；技能的运行在各功能模块内）</span></h3>
-        <div class="row">
-          <div style="flex:2"><label>技能列表（内置 + 自定义）</label>
-            <select id="sk-multi" multiple style="min-height:120px"></select></div>
-          <div style="flex:1">
-            <label>&nbsp;</label>
-            <button class="run ghost" id="sk-refresh" style="margin-top:0;width:100%">刷新技能</button>
-            <button class="run ghost danger" id="sk-del" style="margin-top:8px;width:100%">删除所选自定义技能</button>
-            <span class="status" id="sk-status"></span>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3 style="margin-top:0">导入自定义技能 <span style="font-weight:400;color:var(--muted);font-size:12px">（.zip 自动解压注册包内技能 / .md/.txt 正文即提示词 / .json：{name,desc,prompt}）</span></h3>
-        <div class="row">
-          <div><label>技能文件</label>
-            <input type="file" id="sk-file" accept=".zip,.md,.txt,.json"></div>
-          <div style="flex:1"><label>技能名称（上传 .md/.txt 时用，可留空）</label><input id="sk-name" placeholder="可选" maxlength="40"></div>
-        </div>
-        <span class="status" id="sk-up-status"></span>
-      </div>
-
-      <div class="card">
-        <h3 style="margin-top:0">导出技能 <span style="font-weight:400;color:var(--muted);font-size:12px">（在「技能管理」列表中选中要导出的技能，可多选，导出为 .zip 分享或备份）</span></h3>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <button class="run" id="sk-export">导出所选技能（.zip）</button>
-          <span class="status" id="sk-exp-status"></span>
-        </div>
-      </div>
-
-
     </section>
 
     <!-- 账户管理（仅管理员；从设置中独立为顶层功能点） -->
