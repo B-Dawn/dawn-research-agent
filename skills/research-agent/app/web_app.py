@@ -44,6 +44,7 @@ import auth  # noqa: E402
 import workbench as wb  # noqa: E402
 import bpm  # noqa: E402  流程引擎（JeecgBoot/Flowable 风格 BPM）
 import pipeline  # noqa: E402  全流程编排（①定方向→②调研→③创新点/可行性→④苏格拉底定题→⑤人工审核）
+import paperflow  # noqa: E402  论文全流程（问询→实验训练→论文→盲审→修改→终稿）
 import agent  # noqa: E402  智能体内核（规划→工具调用→观察→反思，ReAct/Plan-Execute/Reflection）
 
 # 服务端内存：保存最近一次检索结果，供「对比矩阵」直接使用
@@ -54,7 +55,7 @@ ADMIN_ONLY_APIS = ("model_set", "model_profiles")
 
 STATIC_DIR = HERE
 INDEX_FILE = os.path.join(STATIC_DIR, "index.html")
-APP_VERSION = "1.1.0"  # 版本号唯一来源：改这里，页面（标题/登录页/侧栏）自动同步
+APP_VERSION = "1.3.0"  # 版本号唯一来源：改这里，页面（标题/登录页/侧栏）自动同步
 APPJS_FILE = os.path.join(STATIC_DIR, "app.js")
 
 
@@ -1279,6 +1280,35 @@ def api_agent(params):
     return {"ok": False, "error": "未知操作 %s" % action}
 
 
+def api_paperflow(params):
+    """论文全流程：status / run / report。run 异步执行（线程），前端轮询 status。"""
+    act = (params.get("action") or "status").strip()
+    by = _who(params)
+    if act == "status":
+        return {"ok": True, **paperflow.state(by)}
+    if act == "report":
+        return {"ok": True, "report_md": paperflow.report_md(paperflow.state(by))}
+    if act == "run":
+        topic = (params.get("topic") or "").strip()
+        if not topic and not (paperflow._u(by).get("cache") or {}).get("topic"):
+            return {"ok": False, "error": "请提供论文题目"}
+        opts = {"topic": topic, "force": bool(params.get("force")),
+                "max_rounds": int(params.get("max_rounds") or 3)}
+        if params.get("only"):
+            opts["only"] = [x.strip() for x in str(params["only"]).split(",") if x.strip()]
+        import threading
+
+        def _worker():
+            try:
+                paperflow.run(by, opts)
+            except Exception as e:
+                print("paperflow run 异常：%s" % e)
+        t = threading.Thread(target=_worker, daemon=True)
+        t.start()
+        return {"ok": True, "note": "论文全流程已启动（后台执行，请稍后刷新状态）"}
+    return {"ok": False, "error": "未知 action：%s" % act}
+
+
 def api_dataset(params):
     """实验数据集：从论文/开题提取数据集名 → Zenodo 检索 → 下载。"""
     action = params.get("action") or "search"
@@ -2117,6 +2147,7 @@ API_MAP = {
     "workflow": api_workflow,
     "bpm": api_bpm,
     "pipeline": api_pipeline,
+    "paperflow": api_paperflow,
     "agent": api_agent,
     "dataset": api_dataset,
     "format": api_format,

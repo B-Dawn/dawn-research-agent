@@ -268,6 +268,7 @@
     <div class="brand">破晓<small>科研智能体 · v__APP_VERSION__ · by B_Dawn</small></div>
     <nav class="nav" id="nav">
       <button data-tab="guide">🧭 论文十步走</button>
+      <button data-tab="paperfull">📄 论文全流程</button>
       <button data-tab="chat" class="active">💬 智能对话</button>
       <div class="nav-group">
         <button class="nav-head">📚 文献与精读<span class="caret">▾</span></button>
@@ -1230,6 +1231,19 @@
     </section>
 
     <!-- 论文引导（小白流程） -->
+    <section data-pane="paperfull" class="hidden">
+      <div class="card">
+        <h3 style="margin-top:0">论文全流程 <span style="font-weight:400;color:var(--muted);font-size:12px">（苏格拉底问询 → 实验方案 → 生成脚本 → 本地训练 → 分析 → 论文初稿 → 模拟盲审 → 修改迭代 → 终稿导出）</span></h3>
+        <div class="row">
+          <div style="flex:3"><label>论文题目</label><input id="pf-topic" placeholder="面向双层AI信任机制的无人机自组网入侵检测与决策可信度监控方法"></div>
+          <div style="flex:0"><label>&nbsp;</label><button class="run" id="pf-run">▶ 启动全流程</button></div>
+          <div style="flex:0"><label>&nbsp;</label><button class="run ghost" id="pf-refresh">刷新状态</button></div>
+        </div>
+        <p class="chat-hint">实验将在本机真实执行（numpy/scikit-learn，3 个随机种子）；论文中的数字只允许来自 results.json；盲审 3 位审稿人，达标 ≥7.5 分或达轮次上限出终稿。全过程约 20–40 分钟，可随时点「刷新状态」。</p>
+        <div id="pf-stages" style="margin-top:10px"></div>
+        <div id="pf-report" class="md" style="margin-top:10px"></div>
+      </div>
+    </section>
     <section data-pane="guide" class="hidden">
       <div class="card">
         <h3 style="margin-top:0">⚡ 一键全流程 <span style="font-weight:400;color:var(--muted);font-size:12px">（自动跑完「交给人工审核之前」的全部内容：①定方向 →②文献调研 →③创新点/可行性 →④苏格拉底问询定题 →⑤提交人工审核。<b>只有经过苏格拉底问询并逐条回应的题目才合格</b>，合格后才送审）</span></h3>
@@ -1322,5 +1336,13 @@
 </div>
 <script>window.__errs=[];window.addEventListener("error",function(e){window.__errs.push(e.message+" @ "+(e.filename||"")+":"+e.lineno)});</script>
 <script src="app.js?v=__APP_VERSION__"></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const pr = document.getElementById("pf-run");
+  if (pr) pr.addEventListener("click", () => { if (typeof pfRun === "function") pfRun(); });
+  const prf = document.getElementById("pf-refresh");
+  if (prf) prf.addEventListener("click", () => { if (typeof pfRefresh === "function") pfRefresh(); });
+});
+</script>
 </body>
 </html>

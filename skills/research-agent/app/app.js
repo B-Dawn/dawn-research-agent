@@ -192,6 +192,7 @@ async function doLogout() {
 // ---------------- 标签页 ----------------
 const TITLES = {
   chat: ["智能对话", "用自然语言指挥科研智能体：检索、对比矩阵、选刊、方向推荐、团队协作与实验复现。"],
+  paperfull: ["论文全流程", "从题目到终稿：问询→实验（本机真实训练）→论文→盲审→修改→终稿。"],
   guide: ["论文十步走", "第一次写论文？按十步流程图一步步完成：每步告诉你为什么做、怎么做、用哪个模块、交付什么。"],
   bpm: ["流程中心", "审批流转（对齐 JeecgBoot/Flowable）：流程定义 → 发起 → 我的待办 → 通过/驳回/转办/委派/加签/抄送 → 流程跟踪。引擎为确定性逻辑，不依赖 AI。"],
   team: ["协作中心", "成员档案与任务板分工；合作邀请在「合作对接」，共同写论文去「论文协作」。"],
@@ -2995,3 +2996,46 @@ function bpmBind() {
   });
 }
 bpmBind();
+
+
+// ================================================================
+// 论文全流程（问询→实验→论文→盲审→修改→终稿）
+// ================================================================
+let _pfTimer = null;
+function pfIcon(st) {
+  return { ok: "✅", warn: "⚠️", blocked: "⛔", fail: "❌", skip: "⏭️", todo: "·" }[st] || "·";
+}
+async function pfBoot() {
+  await pfRefresh();
+  if (!_pfTimer) _pfTimer = setInterval(pfRefresh, 20000);   // 全流程耗时长，自动轮询
+}
+async function pfRefresh() {
+  const r = await post("paperflow", { action: "status" });
+  if (!r || !r.ok) { setStatus("pf-report", (r && r.error) || "加载失败", "err"); return; }
+  const box = $("pf-stages");
+  if (box) {
+    const rows = Object.values(r.stages || {});
+    box.innerHTML = rows.length
+      ? '<table class="tbl"><tr><th>环节</th><th>状态</th><th>说明</th></tr>' +
+        rows.map(x => "<tr><td>" + esc(x.name) + "</td><td>" + pfIcon(x.status) + " " + esc(x.status) +
+          "</td><td>" + esc((x.note || x.error || "").slice(0, 90)) + "</td></tr>").join("") +
+        "</table>"
+      : '<p class="chat-hint">尚未开始。填好题目点「▶ 启动全流程」。</p>';
+  }
+  const rep = $("pf-report");
+  if (rep && r.round) {
+    rep.innerHTML = "<b>校正/当前题目：</b>" + esc(r.topic || "") +
+      "　<b>盲审轮次：</b>" + (r.round || 0) +
+      "　<b>均分轨迹：</b>" + esc((r.scores || []).join(" → ") || "—") +
+      (r.done ? "　<b style='color:var(--ok,#0a8)'>✅ 已达标</b>" : "") +
+      (r.outputs && Object.keys(r.outputs).length
+        ? "<br><b>产物：</b>" + esc(Object.keys(r.outputs).join("、")) : "");
+  }
+}
+const pfRun = async () => {
+  const topic = ($("pf-topic") || {}).value || "";
+  if (!topic.trim()) { setStatus("pf-report", "请先填写论文题目", "err"); return; }
+  setStatus("pf-report", "已提交，后台执行中（约 20–40 分钟），页面每 20 秒自动刷新…");
+  const r = await post("paperflow", { action: "run", topic: topic });
+  setStatus("pf-report", r && r.ok ? "已启动" : ((r && r.error) || "启动失败"), r && r.ok ? "ok" : "err");
+};
