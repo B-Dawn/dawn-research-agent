@@ -358,7 +358,17 @@ def _run_socratic(by, opts, cache):
     if not direction:
         return {"status": "fail", "error": "缺少研究方向，无法问询"}
     evidence = cache.get("digest_summary") or cache.get("digest_md") or ""
-    body = ("研究方向：%s\n\n调研与精读发现（空白/可行性）：\n%s" % (direction, evidence[:5000])).strip()
+    try:
+        _prof = store.load_profile_extra() or {}
+    except Exception:
+        _prof = {}
+    _prof_md = "\n".join("%s：%s" % (k, v) for k, v in _prof.items()
+                         if isinstance(v, str) and v.strip())[:600]
+    body = ("研究方向（追问必须围绕该技术领域，不得偏到教育/政策/管理等其他领域）：%s\n\n%s\n\n"
+            "调研与精读发现（空白/可行性）：\n%s"
+            % (direction,
+               ("个人研究画像：" + _prof_md) if _prof_md else "",
+               evidence[:5000])).strip()
     r = wb.skill_run("socratic_idea", body)
     if not r.get("ok"):
         return {"status": "fail", "error": r.get("error") or "问询生成失败"}
@@ -370,9 +380,12 @@ def _run_socratic(by, opts, cache):
 
 
 _TOPIC_SYS = (
-    "你是研究选题教练。用户给出研究方向、文献调研/精读结论，以及一份苏格拉底式追问清单。"
+    "你是研究选题教练。用户给出研究方向、个人研究画像、文献调研/精读结论，以及一份苏格拉底式追问清单。"
     "请**逐条回答这些追问**，再据此收敛出最终论文题目，并自评合格性。"
     "合格标准：每条追问都有明确、具体、可检验的回应；题目一句话能说清「用什么方法解决什么问题、比谁好在哪」。"
+    "**领域硬约束：题目必须落在「研究方向」所指的技术领域内（如其方向是 AI 安全/网络空间安全，"
+    "则题目必须围绕安全技术的算法、模型、系统或实验验证）；严禁偏航到教育培训、人才培养、产业政策、"
+    "管理思政等其他领域——除非研究方向本身就是该领域。若调研文献中出现其他领域的选题苗头，一律舍弃。**"
     "返回 STRICT JSON（无代码栅栏）："
     '{"qa":[{"q":"追问原文","a":"你的回应"}],'
     '"topic":"最终论文题目（中文，具体可检索）","topic_en":"English title",'
@@ -393,11 +406,21 @@ def _run_topic(by, opts, cache):
     soc = cache.get("socratic_md") or ""
     if not soc:
         return {"status": "fail", "error": "尚未完成苏格拉底问询——按规则，未经问询的题目不合格，不能进入下一步"}
-    body = ("研究方向：%s\n\n调研与精读结论：\n%s\n\n苏格拉底追问清单：\n%s"
+    # 注入用户研究画像，锚定题目领域（防止跑偏到教育/政策等其他领域）
+    prof = {}
+    try:
+        prof = store.load_profile_extra() or {}
+    except Exception:
+        prof = {}
+    prof_md = "\n".join("%s：%s" % (k, v) for k, v in prof.items()
+                        if isinstance(v, str) and v.strip())[:800]
+    body = ("研究方向（领域硬约束，题目不得偏出该技术领域）：%s\n\n%s\n\n调研与精读结论：\n%s\n\n苏格拉底追问清单：\n%s"
             % (cache.get("direction") or "",
+               ("个人研究画像（优先贴合其中的技术积累）：" + prof_md) if prof_md else "",
                (cache.get("digest_summary") or cache.get("digest_md") or "")[:6000], soc[:6000]))
     try:
-        raw = model.quick_ask(body, system=_TOPIC_SYS, max_tokens=2000, temperature=0.3)
+        raw = model.quick_ask(body, system=_TOPIC_SYS, max_tokens=2000, temperature=0.3,
+                              timeout=300)  # 题目 JSON 较长，glm 等模型生成慢，放宽超时
         data = json.loads(re.search(r"\{.*\}", raw, re.S).group(0))
     except Exception as e:
         return {"status": "fail", "error": "题目生成/解析失败（可重试）：%s" % e}
@@ -569,6 +592,10 @@ def run(by, opts=None):
         r["ts"] = _now()
         results[sid] = r
         stages[sid] = r
+        # 守门：题目环节没有（重新）产出合格题目时，清除残留旧题目，
+        # 防止 review 环节拿历史旧题目「幽灵提交」人工审核
+        if sid == "topic" and r.get("status") != "ok":
+            cache.pop("topic", None)
         if r.get("status") == "blocked":
             # 后续 AI 环节也会 blocked，不必再逐个调用
             pass

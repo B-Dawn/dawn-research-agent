@@ -59,7 +59,16 @@ def _default_cfg():
     # 默认即混元：base_url/模型预置好，用户只需在设置里填 API Key
     p = PRESETS["hunyuan"]
     return {"preset": "hunyuan", "backend": p["backend"],
-            "base_url": p["base_url"], "api_key": "", "model": p["model"]}
+            "base_url": p["base_url"], "api_key": "", "model": p["model"],
+            "profiles": [], "active_id": ""}
+
+
+def _write_raw(cfg):
+    os.makedirs(_DATA_DIR, exist_ok=True)
+    tmp = _MODEL_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=1)
+    os.replace(tmp, _MODEL_FILE)
 
 
 def load_cfg():
@@ -69,6 +78,30 @@ def load_cfg():
                 cfg = json.load(f)
             d = _default_cfg()
             d.update({k: v for k, v in cfg.items() if k in d})
+            profiles = d.get("profiles") or []
+            if profiles:
+                aid = d.get("active_id") or profiles[0].get("id") or ""
+                cur = next((p for p in profiles if p.get("id") == aid), profiles[0])
+                d.update({k: cur.get(k, "") for k in
+                          ("backend", "base_url", "api_key", "model")})
+                d["preset"] = cur.get("preset") or "custom"
+                d["active_id"] = cur.get("id") or ""
+                return d
+            # 旧版单槽配置 → 一次性迁移为档案（有内容才迁，空默认不迁）
+            if d.get("api_key") or (d.get("base_url") and d.get("model")):
+                prof = {"id": "p%d" % int(time.time() * 1000),
+                        "name": PRESETS.get(d.get("preset"), {}).get("label", "默认配置"),
+                        "preset": d.get("preset") or "custom",
+                        "backend": d.get("backend") or "openai",
+                        "base_url": d.get("base_url") or "",
+                        "api_key": d.get("api_key") or "",
+                        "model": d.get("model") or ""}
+                d["profiles"] = [prof]
+                d["active_id"] = prof["id"]
+                try:
+                    _write_raw(d)
+                except Exception:
+                    pass
             return d
         except Exception:
             pass
@@ -95,20 +128,86 @@ def cfg_for_preset(name):
 
 
 def save_cfg(cfg):
-    os.makedirs(_DATA_DIR, exist_ok=True)
     cur = load_cfg()
     preset = (cfg.get("preset") or "").strip()
     if preset and preset in PRESETS:
         # 切预设时，未手填的字段用预设值补全（api_key 由用户自己填）
         cur.update(apply_preset(preset))
-        if cfg.get("api_key"):
-            cur["api_key"] = str(cfg["api_key"]).strip()
     for k in ("backend", "base_url", "api_key", "model", "preset"):
         if cfg.get(k) not in (None, ""):
             cur[k] = str(cfg[k]).strip()
-    with open(_MODEL_FILE, "w", encoding="utf-8") as f:
-        json.dump(cur, f, ensure_ascii=False, indent=1)
-    return cur
+    # 写回当前激活档案（profiles 为空则创建首个），并同步平铺镜像
+    profiles = list(cur.get("profiles") or [])
+    aid = cur.get("active_id") or ""
+    prof = next((p for p in profiles if p.get("id") == aid), None)
+    if prof is None:
+        prof = {"id": "p%d" % int(time.time() * 1000),
+                "name": PRESETS.get(cur.get("preset"), {}).get("label", "配置 1")}
+        profiles.append(prof)
+        cur["active_id"] = prof["id"]
+    for k in ("preset", "backend", "base_url", "api_key", "model"):
+        if cur.get(k) not in (None, ""):
+            prof[k] = cur[k]
+    prof["name"] = prof.get("name") or (cfg.get("name") or PRESETS.get(cur.get("preset"), {}).get("label", "配置"))
+    _write_raw({**cur, "profiles": profiles, "active_id": cur.get("active_id") or ""})
+    return load_cfg()
+
+
+# ---------------------------------------------------------------- 多配置档案
+def _profile_id():
+    return "p%d" % int(time.time() * 1000)
+
+
+def list_profiles():
+    cfg = load_cfg()
+    out = []
+    for p in (cfg.get("profiles") or []):
+        out.append({**p, "key_tail": ("…" + p["api_key"][-4:]) if p.get("api_key") else "",
+                    "active": p.get("id") == cfg.get("active_id")})
+    return out, cfg.get("active_id") or ""
+
+
+def upsert_profile(data):
+    """按名称保存配置档案：同名覆盖，否则新建并激活。"""
+    name = (data.get("name") or "").strip()
+    if not name:
+        return False, "请先填写配置名称"
+    cur = load_cfg()
+    profiles = list(cur.get("profiles") or [])
+    prof = next((p for p in profiles if (p.get("name") or "") == name), None)
+    if prof is None:
+        prof = {"id": _profile_id(), "name": name}
+        profiles.append(prof)
+    for k in ("preset", "backend", "base_url", "api_key", "model"):
+        v = (data.get(k) or "").strip() if isinstance(data.get(k), str) else data.get(k)
+        if v not in (None, ""):
+            prof[k] = v
+    prof.setdefault("backend", "openai")
+    cur["profiles"] = profiles
+    cur["active_id"] = prof["id"]
+    _write_raw(cur)
+    return True, load_cfg()
+
+
+def del_profile(pid):
+    cur = load_cfg()
+    profiles = [p for p in (cur.get("profiles") or []) if p.get("id") != pid]
+    if len(profiles) == len(cur.get("profiles") or []):
+        return False, "配置不存在"
+    cur["profiles"] = profiles
+    if cur.get("active_id") == pid:
+        cur["active_id"] = profiles[0]["id"] if profiles else ""
+    _write_raw(cur)
+    return True, load_cfg()
+
+
+def activate_profile(pid):
+    cur = load_cfg()
+    if not any(p.get("id") == pid for p in (cur.get("profiles") or [])):
+        return False, "配置不存在"
+    cur["active_id"] = pid
+    _write_raw(cur)
+    return True, load_cfg()
 
 
 # ---------------------------------------------------------------- 探测
@@ -185,12 +284,18 @@ def status():
     cfg = load_cfg()
     preset = cfg.get("preset", "")
 
+    cfg = load_cfg()
+    preset = cfg.get("preset", "")
+    _prof = next((p for p in (cfg.get("profiles") or []) if p.get("id") == cfg.get("active_id")), None)
+
     def _base():
         return {"preset": preset, "backend_cfg": cfg.get("backend", ""),
                 "base_url": cfg.get("base_url", ""), "model": cfg.get("model", ""),
                 "has_key": bool(cfg.get("api_key")),
                 # 界面"当前已保存模型"指示所需字段
                 "preset_label": PRESETS.get(preset, {}).get("label", preset or "自定义"),
+                "profile_name": (_prof or {}).get("name", ""),
+                "n_profiles": len(cfg.get("profiles") or []),
                 "key_tail": ("…" + cfg["api_key"][-4:]) if cfg.get("api_key") else "",
                 "last_ok": cfg.get("last_ok", ""),
                 "last_ok_model": cfg.get("last_ok_model", ""),
@@ -315,7 +420,7 @@ def _friendly_http_error(code, raw):
     return base
 
 
-def chat(messages, cfg=None, max_tokens=1200, temperature=0.4):
+def chat(messages, cfg=None, max_tokens=1200, temperature=0.4, timeout=_TIMEOUT):
     """调模型。messages: [{"role": "user"/"system"/"assistant", "content": str}]
     返回纯文本；出错抛异常（由调用方转成友好提示）。"""
     r = resolve(cfg)
@@ -355,7 +460,7 @@ def chat(messages, cfg=None, max_tokens=1200, temperature=0.4):
         if wait:
             time.sleep(wait)
         try:
-            out = _http_json(url, payload, headers=headers)
+            out = _http_json(url, payload, headers=headers, timeout=timeout)
             mark_ok(r.get("model") or "")
             break
         except urllib.error.HTTPError as e:
@@ -412,12 +517,12 @@ def test(cfg=None):
         return {"ok": False, "error": msg}
 
 
-def quick_ask(question, system=None, cfg=None, max_tokens=900, temperature=None):
+def quick_ask(question, system=None, cfg=None, max_tokens=900, temperature=None, timeout=_TIMEOUT):
   msgs = []
   if system:
     msgs.append({"role": "system", "content": system})
   msgs.append({"role": "user", "content": question})
-  kwargs = {"cfg": cfg, "max_tokens": max_tokens}
+  kwargs = {"cfg": cfg, "max_tokens": max_tokens, "timeout": timeout}
   if temperature is not None:
     kwargs["temperature"] = temperature
   return chat(msgs, **kwargs)

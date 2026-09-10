@@ -2176,6 +2176,10 @@ async function refreshModelStatus() {
   const admin = !!(ME && ME.role === "admin");
   $("ms-save").disabled = !admin;
   $("ms-test").disabled = !admin;
+  const mspn = $("ms-prof-name"), msps = $("ms-prof-save");
+  if (mspn) mspn.disabled = !admin;
+  if (msps) msps.disabled = !admin;
+  if (admin) renderProfiles();
   // 统一写入 ms-status（合并了原来的 ms-state + ms-status 双区）
   const st = $("ms-status");
   if (r.ok) {
@@ -2206,7 +2210,10 @@ function renderSavedModel(r, id, detail) {
     verified = '<span style="color:var(--warn,#c80)">○ 尚未验证（点「测试连接」实际调一次）</span>';
   }
   let html = '<b>当前已保存模型：</b>' + esc(model) +
-    ' <span style="color:var(--muted)">· ' + esc(label) + ' · ' + esc(keyTxt) + '</span><br>' + verified;
+    ' <span style="color:var(--muted)">· ' + esc(label) + ' · ' + esc(keyTxt) + '</span>' +
+    (r.profile_name ? ' <span style="color:var(--muted)">· 档案「' + esc(r.profile_name) + '」' +
+      (r.n_profiles > 1 ? '（共 ' + r.n_profiles + ' 个，可在下方列表切换）' : '') + '</span>' : "") +
+    '<br>' + verified;
   if (r.last_error) {
     html += '<br><span style="color:var(--err,#c33)">最近失败：' + esc(r.last_error) + '</span>';
   }
@@ -2237,6 +2244,61 @@ function cfgFromForm() {
 $("ms-save").addEventListener("click", async () => {
   const r = await post("model_set", cfgFromForm());
   setStatus("ms-status", r.ok ? "配置已保存" : ("保存失败：" + (r.error || "未知")), r.ok ? "ok" : "err");
+  refreshModelStatus();
+});
+// ---------------- 多配置档案 ----------------
+async function renderProfiles() {
+  const box = $("ms-profiles");
+  if (!box) return;
+  const r = await post("model_profiles", { action: "list" });
+  if (!r || !r.ok) { box.innerHTML = '<span style="color:var(--muted);font-size:12px">档案列表加载失败</span>'; return; }
+  const pros = r.profiles || [];
+  if (!pros.length) {
+    box.innerHTML = '<span style="color:var(--muted);font-size:12px">还没有档案。填好表单后起个名字，点「💾 存为新配置」即可保存第一个。</span>';
+    return;
+  }
+  box.innerHTML = pros.map(p =>
+    '<div class="row" style="align-items:center;gap:8px;margin:0;padding:8px 12px;background:var(--panel2);border-radius:8px">' +
+      (p.active ? '<span style="color:var(--ok,#0a8);font-weight:700">● 使用中</span>' : '<span style="color:var(--muted)">○</span>') +
+      '<b>' + esc(p.name || "（未命名）") + '</b>' +
+      '<span style="color:var(--muted);font-size:12px">' + esc(p.model || "") +
+        (p.base_url ? ' · ' + esc(p.base_url.replace(/^https?:\/\//, "").slice(0, 34)) : "") +
+        (p.key_tail ? ' · Key ' + esc(p.key_tail) : " · 未填Key") + '</span>' +
+      '<span style="flex:1"></span>' +
+      (p.active ? "" : '<button class="btn-mini" data-mp-act="' + esc(p.id) + '">启用</button>') +
+      '<button class="btn-mini" data-mp-edit="' + esc(p.id) + '" data-mp-name="' + esc(p.name || "") + '">载入编辑</button>' +
+      '<button class="btn-mini danger" data-mp-del="' + esc(p.id) + '">删除</button>' +
+    '</div>').join("");
+  box.querySelectorAll("[data-mp-act]").forEach(b => b.addEventListener("click", async () => {
+    const r2 = await post("model_profiles", { action: "activate", id: b.dataset.mpAct });
+    setStatus("ms-status", r2 && r2.ok ? "已切换启用的配置" : ("切换失败：" + (r2 && r2.error || "")), r2 && r2.ok ? "ok" : "err");
+    refreshModelStatus();
+  }));
+  box.querySelectorAll("[data-mp-del]").forEach(b => b.addEventListener("click", async () => {
+    if (!confirm("确认删除该配置档案？（不影响其他档案）")) return;
+    const r2 = await post("model_profiles", { action: "del", id: b.dataset.mpDel });
+    setStatus("ms-status", r2 && r2.ok ? "已删除" : ("删除失败：" + (r2 && r2.error || "")), r2 && r2.ok ? "ok" : "err");
+    refreshModelStatus();
+  }));
+  box.querySelectorAll("[data-mp-edit]").forEach(b => b.addEventListener("click", async () => {
+    const r2 = await post("model_profiles", { action: "list" });
+    const p = ((r2 && r2.profiles) || []).find(x => x.id === b.dataset.mpEdit);
+    if (!p) return;
+    $("ms-preset").value = p.preset || "custom";
+    if (p.backend) $("ms-backend").value = p.backend;
+    $("ms-url").value = p.base_url || "";
+    $("ms-model").value = p.model || "";
+    $("ms-key").value = "";   // 安全起见不回显 Key；留空保存=沿用已存 Key
+    $("ms-prof-name").value = p.name || "";
+    setStatus("ms-status", "已载入「" + (p.name || "") + "」到表单；改完点「💾 存为新配置」覆盖同名档案", "ok");
+  }));
+}
+$("ms-prof-save").addEventListener("click", async () => {
+  const f = cfgFromForm();
+  f.name = ($("ms-prof-name") || {}).value || "";
+  const r = await post("model_profiles", { action: "save", profile: f });
+  if (!r || !r.ok) { setStatus("ms-status", "保存失败：" + (r && r.error || "未知"), "err"); return; }
+  setStatus("ms-status", "已保存配置「" + f.name + "」并启用", "ok");
   refreshModelStatus();
 });
 $("ms-test").addEventListener("click", async () => {

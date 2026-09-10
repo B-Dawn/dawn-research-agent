@@ -50,7 +50,7 @@ import agent  # noqa: E402  智能体内核（规划→工具调用→观察→�
 _LAST_SEARCH = {"query": "", "records": []}
 
 # 权限表：除认证接口(auth)外，所有接口都要求登录；模型配置仅限管理员
-ADMIN_ONLY_APIS = ("model_set",)
+ADMIN_ONLY_APIS = ("model_set", "model_profiles")
 
 STATIC_DIR = HERE
 INDEX_FILE = os.path.join(STATIC_DIR, "index.html")
@@ -373,6 +373,25 @@ def api_model_set(params):
         if not t["ok"]:
             result["error"] = "测试失败：%s（配置已保存，可重试）" % t.get("error", "")
     return result
+
+
+def api_model_profiles(params):
+    """多配置档案：list / save(按名 upsert 并激活) / activate / del。"""
+    act = (params.get("action") or "list").strip()
+    if act == "list":
+        pros, aid = model.list_profiles()
+        return {"ok": True, "profiles": pros, "active_id": aid}
+    if act == "save":
+        ok, res = model.upsert_profile(params.get("profile") or params)
+        return {"ok": ok, "error": None if ok else res, "status": model.status()} if ok else \
+               {"ok": False, "error": res}
+    if act == "activate":
+        ok, res = model.activate_profile(params.get("id") or "")
+        return {"ok": ok, "status": model.status()} if ok else {"ok": False, "error": res}
+    if act == "del":
+        ok, res = model.del_profile(params.get("id") or "")
+        return {"ok": ok, "status": model.status()} if ok else {"ok": False, "error": res}
+    return {"ok": False, "error": "未知 action：%s" % act}
 
 
 def _model_unavailable():
@@ -2077,6 +2096,7 @@ API_MAP = {
     "validate": api_validate,
     "model_status": api_model_status,
     "model_set": api_model_set,
+    "model_profiles": api_model_profiles,
     "ask": api_ask,
     "ai_profile": api_ai_profile,
     "ai_recommend": api_ai_recommend,

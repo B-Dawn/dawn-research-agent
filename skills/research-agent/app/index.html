@@ -935,15 +935,20 @@
           <div><label>模型名</label><input id="ms-model" placeholder="切预设会自动填入" maxlength="120"></div>
         </div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px">
-          <button class="run" id="ms-save">保存配置</button>
+          <button class="run" id="ms-save">保存到当前配置</button>
+          <input id="ms-prof-name" placeholder="新配置名称（如：智谱GLM-4.6）" style="width:200px" maxlength="60">
+          <button class="run ghost" id="ms-prof-save">💾 存为新配置</button>
           <button class="run ghost" id="ms-test">测试连接</button>
         </div>
         <div class="status" id="ms-status" style="margin-top:8px"></div>
         <div id="ms-current" style="margin-top:12px;padding:10px 14px;background:var(--panel2);border-radius:8px;font-size:13px;line-height:1.7"></div>
+        <h4 style="margin:16px 0 6px">已保存的配置档案 <span style="font-weight:400;color:var(--muted);font-size:12px">（可存多个，一键切换；保存后旧的不会被覆盖丢失）</span></h4>
+        <div id="ms-profiles" style="display:flex;flex-direction:column;gap:6px"></div>
         <details style="margin-top:10px"><summary style="cursor:pointer;color:var(--muted);font-size:12px">使用说明</summary>
         <p style="color:var(--muted);font-size:12px;margin:6px 0 0;line-height:1.7">
           默认预设为腾讯混元，选预设后 Base URL 与模型名会自动填好，只需补 API Key 即可。<br>
-          「自定义 OpenAI 兼容」可接入 DeepSeek / Kimi / GLM / 中转等任何兼容端点。<br>
+          「自定义 OpenAI 兼容」可接入 DeepSeek / Kimi / GLM / 中转等任何兼容端点，且可**存多个命名配置**随时切换。<br>
+          「保存到当前配置」更新正在使用的档案；「存为新配置」按名称新建/覆盖同名档案并立即启用。<br>
           隐私提示：远端 API 会将问题发送至对应服务商；本地 Ollama 数据不出本机。
         </p>
         </details>
