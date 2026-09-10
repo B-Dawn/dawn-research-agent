@@ -1940,7 +1940,6 @@ async function fillProfileExtra() {
 }
 async function refreshModelStatus() {
   const r = await post("model_status", {});
-  const s = $("ms-state");
   if (!r) return;
   // 预填表单（不含 api_key）
   if (r.preset) $("ms-preset").value = r.preset;
@@ -1950,15 +1949,15 @@ async function refreshModelStatus() {
   const admin = !!(ME && ME.role === "admin");
   $("ms-save").disabled = !admin;
   $("ms-test").disabled = !admin;
+  // 统一写入 ms-status（合并了原来的 ms-state + ms-status 双区）
+  const st = $("ms-status");
   if (r.ok) {
-    s.className = "status ok";
-    s.textContent = "已连接：" + (r.backend === "ollama" ? "本地 Ollama" : "OpenAI 兼容 API") + " · " + (r.model || "auto") + (r.has_key ? "" : "（未填 Key）");
-    if (!admin) $("ms-status").textContent = "模型为全局设置，仅管理员可修改。";
+    st.className = "status ok";
+    st.textContent = "已连接：" + (r.backend === "ollama" ? "本地 Ollama" : "OpenAI 兼容 API") + " · " + (r.model || "auto") + (r.has_key ? "" : "（未填 Key）");
   } else {
-    s.className = "status err";
-    s.textContent = "未配置模型" + (r.has_key ? "" : "（缺 API Key）");
-    if (!admin && ME) $("ms-status").textContent = "模型为全局设置，仅管理员可修改。";
-    else $("ms-status").textContent = r.reason || "";
+    st.className = "status err";
+    if (!admin && ME) st.textContent = "模型为全局设置，仅管理员可修改。";
+    else st.textContent = r.reason || "未配置模型" + (r.has_key ? "" : "（缺 API Key）");
   }
   renderSavedModel(r, "ms-current", true);
 }
@@ -2006,7 +2005,7 @@ async function refreshChatModelBadge() {
   }
 }
 function cfgFromForm() {
-  return { backend: $("ms-backend").value, base_url: $("ms-url").value.trim(), api_key: $("ms-key").value.trim(), model: $("ms-model").value.trim() };
+  return { preset: $("ms-preset").value, backend: $("ms-backend").value, base_url: $("ms-url").value.trim(), api_key: $("ms-key").value.trim(), model: $("ms-model").value.trim() };
 }
 $("ms-save").addEventListener("click", async () => {
   const r = await post("model_set", cfgFromForm());

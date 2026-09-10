@@ -804,10 +804,10 @@
     <!-- 设置 -->
     <section data-pane="settings" class="hidden">
       <div class="card">
-        <h3 style="margin-top:0">模型设置 <span style="font-weight:400;color:var(--muted);font-size:12px">（AI 判断 / AI 问答 / AI 诊断的前提，保存一次即可；为全局设置，仅管理员可改）</span></h3>
+        <h3 style="margin-top:0">模型设置 <span style="font-weight:400;color:var(--muted);font-size:12px">（全局设置，仅管理员可改；AI 问答 / AI 诊断 均依赖此配置）</span></h3>
         <div class="row">
           <div>
-            <label>预设（默认腾讯混元，免费额度）</label>
+            <label>预设</label>
             <select id="ms-preset">
               <option value="hunyuan">腾讯混元（默认 · 免费额度）</option>
               <option value="deepseek">DeepSeek</option>
@@ -829,21 +829,26 @@
           </div>
         </div>
         <div class="row">
-          <div style="flex:2"><label>Base URL（OpenAI 兼容端点，切预设会自动填好）</label>
-            <input id="ms-url" placeholder="https://api.hunyuan.cloud.tencent.com/v1" maxlength="200"></div>
+          <div style="flex:2"><label>Base URL</label>
+            <input id="ms-url" placeholder="切预设会自动填入" maxlength="200"></div>
         </div>
         <div class="row">
-          <div><label>API Key（本地网关可留空）</label><input id="ms-key" type="password" placeholder="sk-…" maxlength="200"></div>
-          <div><label>模型名</label><input id="ms-model" placeholder="hunyuan-turbos-latest" maxlength="120"></div>
+          <div><label>API Key</label><input id="ms-key" type="password" placeholder="sk-…" maxlength="200"></div>
+          <div><label>模型名</label><input id="ms-model" placeholder="切预设会自动填入" maxlength="120"></div>
         </div>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <button class="run" id="ms-save" style="margin-top:10px">保存配置</button>
-          <button class="run ghost" id="ms-test" style="margin-top:10px">测试连接</button>
-          <span class="status" id="ms-state"></span>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px">
+          <button class="run" id="ms-save">保存配置</button>
+          <button class="run ghost" id="ms-test">测试连接</button>
         </div>
-        <div class="status" id="ms-status"></div>
-        <div id="ms-current" style="margin-top:10px;padding:10px 12px;border:1px dashed var(--line);border-radius:10px;font-size:13px;line-height:1.7"></div>
-        <p style="color:var(--muted);font-size:12px;margin:10px 0 0">默认即腾讯混元（OpenAI 兼容端点，需自备 API Key，新用户通常有免费额度）。切预设会自动填好 Base URL 与模型名，你只补 API Key。对话框会默认走这个模型。若你持有其它平台的 OpenAI 兼容额度（DeepSeek/Kimi/GLM/中转等），选「自定义 OpenAI 兼容」填入端点+Key 即可。隐私：选远端 API 会把问题（含画像）发到该服务；本地 Ollama 数据不出本机。</p>
+        <div class="status" id="ms-status" style="margin-top:8px"></div>
+        <div id="ms-current" style="margin-top:12px;padding:10px 14px;background:var(--panel2);border-radius:8px;font-size:13px;line-height:1.7"></div>
+        <details style="margin-top:10px"><summary style="cursor:pointer;color:var(--muted);font-size:12px">使用说明</summary>
+        <p style="color:var(--muted);font-size:12px;margin:6px 0 0;line-height:1.7">
+          默认预设为腾讯混元，选预设后 Base URL 与模型名会自动填好，只需补 API Key 即可。<br>
+          「自定义 OpenAI 兼容」可接入 DeepSeek / Kimi / GLM / 中转等任何兼容端点。<br>
+          隐私提示：远端 API 会将问题发送至对应服务商；本地 Ollama 数据不出本机。
+        </p>
+        </details>
       </div>
 
       <div class="card">
