@@ -23,6 +23,7 @@ backend=auto 时：优先用已保存的 openai 配置；否则自动探测本�
 
 import json
 import os
+import time
 import urllib.request
 import urllib.error
 
@@ -39,6 +40,16 @@ PRESETS = {
                  "base_url": "https://api.deepseek.com/v1", "model": "deepseek-chat"},
     "ollama": {"label": "本地 Ollama", "backend": "ollama",
                "base_url": "http://127.0.0.1:11434", "model": "qwen2.5:7b"},
+    # 以下为有免费额度/免费模型的 OpenAI 兼容端点，注册后领 Key 即可
+    "siliconflow": {"label": "SiliconFlow（Qwen 免费模型）", "backend": "openai",
+                    "base_url": "https://api.siliconflow.cn/v1",
+                    "model": "Qwen/Qwen2.5-7B-Instruct"},
+    "zhipu": {"label": "智谱 GLM（Flash 免费）", "backend": "openai",
+              "base_url": "https://open.bigmodel.cn/api/paas/v4",
+              "model": "glm-4-flash"},
+    "modelscope": {"label": "魔搭 ModelScope（每日免费额度）", "backend": "openai",
+                   "base_url": "https://api-inference.modelscope.cn/v1",
+                   "model": "Qwen/Qwen2.5-7B-Instruct"},
     "custom": {"label": "自定义 OpenAI 兼容", "backend": "openai", "base_url": "", "model": ""},
 }
 
@@ -139,6 +150,36 @@ def resolve(cfg=None):
             "reason": "手动指定 %s" % backend}
 
 
+def mark_ok(model_name=""):
+    """记录一次成功调用（供界面显示"已验证可用"）。"""
+    try:
+        cur = load_cfg()
+        cur["last_ok"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        if model_name:
+            cur["last_ok_model"] = model_name
+        cur["last_error"] = ""
+        _write_cfg(cur)
+    except Exception:
+        pass
+    return True
+
+
+def mark_error(msg):
+    try:
+        cur = load_cfg()
+        cur["last_error"] = "%s（%s）" % (msg, time.strftime("%Y-%m-%d %H:%M:%S"))
+        _write_cfg(cur)
+    except Exception:
+        pass
+    return True
+
+
+def _write_cfg(cur):
+    os.makedirs(_DATA_DIR, exist_ok=True)
+    with open(_MODEL_FILE, "w", encoding="utf-8") as f:
+        json.dump(cur, f, ensure_ascii=False, indent=1)
+
+
 def status():
     """给前端的模型可用性状态。"""
     cfg = load_cfg()
@@ -147,7 +188,13 @@ def status():
     def _base():
         return {"preset": preset, "backend_cfg": cfg.get("backend", ""),
                 "base_url": cfg.get("base_url", ""), "model": cfg.get("model", ""),
-                "has_key": bool(cfg.get("api_key"))}
+                "has_key": bool(cfg.get("api_key")),
+                # 界面"当前已保存模型"指示所需字段
+                "preset_label": PRESETS.get(preset, {}).get("label", preset or "自定义"),
+                "key_tail": ("…" + cfg["api_key"][-4:]) if cfg.get("api_key") else "",
+                "last_ok": cfg.get("last_ok", ""),
+                "last_ok_model": cfg.get("last_ok_model", ""),
+                "last_error": cfg.get("last_error", "")}
 
     r = resolve(cfg)
     ok = r["backend"] in ("openai", "ollama")
@@ -181,14 +228,71 @@ def status():
 
 
 # ---------------------------------------------------------------- 调用
+def _make_opener(use_proxy):
+    """use_proxy=False 时构造"忽略一切代理配置"的直连 opener。
+
+    必要性：本进程可能从带 HTTP_PROXY/HTTPS_PROXY 的会话里启动（如被其他工具拉起），
+    urllib 默认会读环境变量与注册表代理；若本地代理（如 127.0.0.1:7877）未运行，
+    就会报 WinError 10061 连接被拒，表现为"模型连不上"。
+    """
+    if use_proxy:
+        return urllib.request.build_opener()
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
 def _http_json(url, payload, headers=None, timeout=_TIMEOUT):
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(url, data=data, method="POST")
     req.add_header("Content-Type", "application/json")
     for k, v in (headers or {}).items():
         req.add_header(k, v)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    last_err = None
+    # 先直连；直连不通且确实配置了代理时，再走代理重试（兼容需要代理访问境外端点的场景）
+    for use_proxy in (False, True):
+        try:
+            with _make_opener(use_proxy).open(req, timeout=timeout) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError:
+            raise
+        except (urllib.error.URLError, OSError) as e:
+            last_err = e
+            if use_proxy or not urllib.request.getproxies():
+                break
+    raise last_err
+
+
+def _friendly_http_error(code, raw):
+    """把网关返回的错误体翻译成用户能看懂的中文提示。"""
+    msg_zh, msg_en, rtype = "", "", ""
+    try:
+        o = json.loads(raw)
+        err = o.get("error") or o
+        msg_zh = err.get("message_zh") or ""
+        msg_en = err.get("message") or ""
+        rtype = err.get("type") or ""
+        rid = err.get("request_id") or o.get("request_id") or ""
+    except Exception:
+        rid = ""
+    if code == 429:
+        base = "模型服务繁忙或已达容量上限（429 限流）"
+    elif code == 401:
+        base = "API Key 无效或未授权（401），请检查设置里的 Key"
+    elif code == 403:
+        base = "无权限访问该模型（403），可能 Key 未开通此模型"
+    elif code == 404:
+        base = "接口或模型不存在（404），请检查 Base URL 与模型名"
+    elif code in (500, 502, 503, 504):
+        base = "模型服务端故障（%s），稍后重试" % code
+    else:
+        base = "模型 API HTTP %s" % code
+    extra = msg_zh or msg_en
+    if extra:
+        base += "：" + extra[:200]
+    if rtype and "rate_limit" in rtype and "限流" not in base:
+        base += "（限流）"
+    if rid:
+        base += "  [request_id: %s]" % rid
+    return base
 
 
 def chat(messages, cfg=None, max_tokens=1200, temperature=0.4):
@@ -201,8 +305,23 @@ def chat(messages, cfg=None, max_tokens=1200, temperature=0.4):
         payload = {"model": r.get("model") or "llama3", "messages": messages,
                    "stream": False, "options": {"temperature": temperature,
                                                 "num_predict": max_tokens}}
-        out = _http_json(r["base_url"] + "/api/chat", payload)
-        return (out.get("message") or {}).get("content", "").strip()
+        try:
+            out = _http_json(r["base_url"] + "/api/chat", payload)
+            mark_ok(r.get("model") or "")
+        except urllib.error.HTTPError as e:
+            detail = ""
+            try:
+                detail = e.read().decode("utf-8")[:200]
+            except Exception:
+                pass
+            raise RuntimeError("Ollama HTTP %s：%s（模型是否已 `ollama pull %s`？）"
+                               % (e.code, detail or e.reason, r.get("model") or "llama3"))
+        except (urllib.error.URLError, OSError) as e:
+            raise RuntimeError("无法连接 Ollama（%s）：请确认已启动 `ollama serve`" % e)
+        text = (out.get("message") or {}).get("content", "").strip()
+        if not text and out.get("error"):
+            raise RuntimeError("Ollama 返回错误：%s" % out["error"])
+        return text
     # openai 兼容
     url = r["base_url"].rstrip("/")
     if not url.endswith("/chat/completions"):
@@ -210,16 +329,37 @@ def chat(messages, cfg=None, max_tokens=1200, temperature=0.4):
     headers = {"Authorization": "Bearer " + (r.get("api_key") or "")}
     payload = {"model": r.get("model"), "messages": messages,
                "temperature": temperature, "max_tokens": max_tokens}
+    # 429/503 属瞬时限流，自动退避重试（共 3 次尝试：0s / 2s / 6s 后）
+    out, last = None, None
+    for attempt, wait in enumerate((0, 2, 6)):
+        if wait:
+            time.sleep(wait)
+        try:
+            out = _http_json(url, payload, headers=headers)
+            mark_ok(r.get("model") or "")
+            break
+        except urllib.error.HTTPError as e:
+            if e.code in (429, 503) and attempt < 2:
+                last = e
+                continue
+            raise
+    if out is None:
+        raise last
     try:
-        out = _http_json(url, payload, headers=headers)
-        return (out["choices"][0]["message"]["content"] or "").strip()
+        ch = out.get("choices")
+        if not ch:
+            # 限流、余额不足、模型名错误等情况不会带 choices，直接暴露后端给的原因
+            raise RuntimeError("模型返回异常：%s"
+                               % (out.get("error", {}).get("message")
+                                  or out.get("message") or json.dumps(out, ensure_ascii=False)[:200]))
+        return ((ch[0].get("message") or {}).get("content") or "").strip()
     except urllib.error.HTTPError as e:
         detail = ""
         try:
-            detail = e.read().decode("utf-8")[:300]
+            detail = e.read().decode("utf-8", "ignore")[:600]
         except Exception:
             pass
-        raise RuntimeError("模型 API HTTP %s：%s" % (e.code, detail or e.reason))
+        raise RuntimeError(_friendly_http_error(e.code, detail or str(e.reason)))
     except (urllib.error.URLError, OSError) as e:
         raise RuntimeError("无法连接模型服务：%s" % e)
 
@@ -229,9 +369,12 @@ def test(cfg=None):
     try:
         reply = chat([{"role": "user", "content": "请只回复：连接成功"}],
                      cfg=cfg, max_tokens=20, temperature=0)
+        mark_ok((cfg or load_cfg()).get("model", ""))
         return {"ok": True, "reply": reply}
     except Exception as e:
-        return {"ok": False, "error": str(e)}
+        msg = str(e)
+        mark_error(msg)
+        return {"ok": False, "error": msg}
 
 
 def quick_ask(question, system=None, cfg=None, max_tokens=900):

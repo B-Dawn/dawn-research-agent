@@ -300,6 +300,7 @@
         <div class="chat-log" id="chat-log"></div>
         <div class="row" style="margin-top:10px;align-items:center">
           <div><label>本次对话模型</label><select id="chat-model" style="min-width:170px"><option value="">全局配置（默认）</option></select></div>
+          <div id="chat-curmodel" style="font-size:12px;line-height:1.6;flex:1;min-width:220px"></div>
         </div>
         <div class="chat-input">
           <textarea id="chat-in" rows="2"
@@ -810,7 +811,10 @@
             <select id="ms-preset">
               <option value="hunyuan">腾讯混元（默认 · 免费额度）</option>
               <option value="deepseek">DeepSeek</option>
-              <option value="ollama">本地 Ollama</option>
+              <option value="ollama">本地 Ollama（免费 · 需本地安装）</option>
+              <option value="siliconflow">SiliconFlow（Qwen 免费模型）</option>
+              <option value="zhipu">智谱 GLM（Flash 免费）</option>
+              <option value="modelscope">魔搭 ModelScope（每日免费额度）</option>
               <option value="custom">自定义 OpenAI 兼容</option>
             </select>
           </div>
@@ -838,6 +842,7 @@
           <span class="status" id="ms-state"></span>
         </div>
         <div class="status" id="ms-status"></div>
+        <div id="ms-current" style="margin-top:10px;padding:10px 12px;border:1px dashed var(--line);border-radius:10px;font-size:13px;line-height:1.7"></div>
         <p style="color:var(--muted);font-size:12px;margin:10px 0 0">默认即腾讯混元（OpenAI 兼容端点，需自备 API Key，新用户通常有免费额度）。切预设会自动填好 Base URL 与模型名，你只补 API Key。对话框会默认走这个模型。若你持有其它平台的 OpenAI 兼容额度（DeepSeek/Kimi/GLM/中转等），选「自定义 OpenAI 兼容」填入端点+Key 即可。隐私：选远端 API 会把问题（含画像）发到该服务；本地 Ollama 数据不出本机。</p>
       </div>
 

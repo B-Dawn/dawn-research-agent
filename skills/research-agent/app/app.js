@@ -232,7 +232,7 @@ function switchTab(tab) {
   if (tab === "memory") { loadMems(); }
   if (tab === "mypaper") { loadMyPapers(); loadDpPapers(); }
   if (tab === "guide") { bootGuide(); }
-  if (tab === "chat") { refreshChatSelectors(); }
+  if (tab === "chat") { refreshChatSelectors(); refreshChatModelBadge(); }
   if (tab === "reflib") { loadFolders(); }
   if (tab === "reviewhub") { loadReviews(); loadMine(); loadPartnersForReview(); }
   if (tab === "accounts") { loadAccounts(); }
@@ -1921,6 +1921,9 @@ const PRESET_MAP = {
   hunyuan: { backend: "openai", base_url: "https://api.hunyuan.cloud.tencent.com/v1", model: "hunyuan-turbos-latest" },
   deepseek: { backend: "openai", base_url: "https://api.deepseek.com/v1", model: "deepseek-chat" },
   ollama: { backend: "ollama", base_url: "http://127.0.0.1:11434", model: "qwen2.5:7b" },
+  siliconflow: { backend: "openai", base_url: "https://api.siliconflow.cn/v1", model: "Qwen/Qwen2.5-7B-Instruct" },
+  zhipu: { backend: "openai", base_url: "https://open.bigmodel.cn/api/paas/v4", model: "glm-4-flash" },
+  modelscope: { backend: "openai", base_url: "https://api-inference.modelscope.cn/v1", model: "Qwen/Qwen2.5-7B-Instruct" },
   custom: { backend: "openai", base_url: "", model: "" },
 };
 const PE_KEYS = ["direction_cn", "direction_en", "skills", "works", "innovations", "target_journals", "constraints", "goals"];
@@ -1956,6 +1959,50 @@ async function refreshModelStatus() {
     s.textContent = "未配置模型" + (r.has_key ? "" : "（缺 API Key）");
     if (!admin && ME) $("ms-status").textContent = "模型为全局设置，仅管理员可修改。";
     else $("ms-status").textContent = r.reason || "";
+  }
+  renderSavedModel(r, "ms-current", true);
+}
+
+// 统一的"当前已保存模型"指示（设置页详尽版 / 对话页精简版）
+function renderSavedModel(r, id, detail) {
+  const el = $(id);
+  if (!el || !r) return;
+  const model = r.model || "（未设置模型名）";
+  const label = r.preset_label || r.preset || "自定义";
+  const keyTxt = r.has_key ? ("Key 已保存 " + (r.key_tail || "")) : "未填 API Key";
+  let verified = "";
+  if (r.last_ok) {
+    const sameModel = !r.last_ok_model || r.last_ok_model === model;
+    verified = sameModel
+      ? '<span style="color:var(--ok,#0a8)">✓ 已验证可用（' + r.last_ok + '）</span>'
+      : '<span style="color:var(--ok,#0a8)">✓ 曾验证成功（' + r.last_ok + '，当时模型 ' + esc(r.last_ok_model) + '）</span>';
+  } else {
+    verified = '<span style="color:var(--warn,#c80)">○ 尚未验证（点「测试连接」实际调一次）</span>';
+  }
+  let html = '<b>当前已保存模型：</b>' + esc(model) +
+    ' <span style="color:var(--muted)">· ' + esc(label) + ' · ' + esc(keyTxt) + '</span><br>' + verified;
+  if (r.last_error) {
+    html += '<br><span style="color:var(--err,#c33)">最近失败：' + esc(r.last_error) + '</span>';
+  }
+  if (detail) {
+    html += '<br><span style="color:var(--muted)">端点：' + esc(r.base_url || "（空）") +
+      ' · 后端：' + esc(r.backend_cfg || "auto") + '</span>';
+  }
+  el.innerHTML = html;
+}
+
+// 对话页：显示当前会走哪个模型
+async function refreshChatModelBadge() {
+  const el = $("chat-curmodel");
+  if (!el) return;
+  const r = await post("model_status", {});
+  if (!r) return;
+  const cur = ($("chat-model") || {}).value || "";
+  if (cur) {
+    el.innerHTML = '<span style="color:var(--muted)">本次对话使用：</span><b>' + esc(cur) + '</b>' +
+      '<span style="color:var(--muted)">（临时切换，不影响已保存配置）</span>';
+  } else {
+    renderSavedModel(r, "chat-curmodel", false);
   }
 }
 function cfgFromForm() {
