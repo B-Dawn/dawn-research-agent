@@ -193,6 +193,7 @@ async function doLogout() {
 const TITLES = {
   chat: ["智能对话", "用自然语言指挥科研智能体：检索、对比矩阵、选刊、方向推荐、团队协作与实验复现。"],
   guide: ["论文十步走", "第一次写论文？按十步流程图一步步完成：每步告诉你为什么做、怎么做、用哪个模块、交付什么。"],
+  bpm: ["流程中心", "审批流转（对齐 JeecgBoot/Flowable）：流程定义 → 发起 → 我的待办 → 通过/驳回/转办/委派/加签/抄送 → 流程跟踪。引擎为确定性逻辑，不依赖 AI。"],
   team: ["协作中心", "成员档案与任务板分工；合作邀请在「合作对接」，共同写论文去「论文协作」。"],
   collab: ["合作对接", "向系统内其他注册用户发起合作邀请；接受后互为合作者，再到「论文协作」授权共同写作。"],
   paper: ["论文协作", "论文项目：章节草稿 / 审阅意见 / 协作者权限（可编辑·仅查看）；项目自动收录进协作者「我的论文」。"],
@@ -233,6 +234,7 @@ function switchTab(tab) {
   if (tab === "memory") { loadMems(); }
   if (tab === "mypaper") { loadMyPapers(); loadDpPapers(); }
   if (tab === "guide") { bootGuide(); }
+  if (tab === "bpm") { bpmBoot(); }
   if (tab === "chat") { refreshChatSelectors(); refreshChatModelBadge(); }
   if (tab === "reflib") { loadFolders(); }
   if (tab === "reviewhub") { loadReviews(); loadMine(); loadPartnersForReview(); }
@@ -298,6 +300,7 @@ function addAgent(md) {
 const MODULE_INFO = {
   memory:   { tab: "memory",   label: "长期记忆",     icon: "🧠", changed: true },
   workflow: { tab: "guide",    label: "论文十步走",   icon: "🧭", changed: true },
+  bpm:      { tab: "bpm",      label: "流程中心",     icon: "🔀", changed: true },
   mypaper:  { tab: "mypaper",  label: "我的论文",     icon: "📄" },
   journal:  { tab: "journal",  label: "选刊",         icon: "📮" },
   plot:     { tab: "plot",     label: "出图",         icon: "📊" },
@@ -352,6 +355,9 @@ function chatWelcome() {
     "**实验与团队：**\n" +
     "- 登记实验 <名称> / 查一下实验台账 / 校验：<粘贴CSV>\n" +
     "- 看看任务进度 / 新建论文 <标题>\n\n" +
+    "**审批流程（🔀 流程中心）：**\n" +
+    "- 我的待办 / 我发起的流程 / 发起流程\n" +
+    "- 内置模板：论文送审审批、开题报告审批、实验资源申请、通用审批；支持通过/驳回/转办/委派/加签/抄送/会签/条件分支\n\n" +
     "**记忆：** 记住：<内容> / 查看记忆\n\n" +
     "> 技能在各模块内调用（检索页有「是否调用」开关）；自定义技能在「设置 → 技能中心」上传。当前为**离线环境**时检索类返回空并提示；统计分析/团队协作无需联网。";
   addAgent(md);
@@ -2269,3 +2275,585 @@ $("ac-add").addEventListener("click", async () => {
 });
 bindAccountOps();
 
+
+// ================================================================
+// 流程中心（BPM 审批流转）—— 能力对齐 JeecgBoot / Flowable
+//   定义 → 发起 → 待办办理(通过/驳回/转办/委派/加签/抄送/催办) → 流程跟踪
+//   引擎为后端确定性逻辑（bpm.py），不依赖 AI；AI 仅用于可选的「一句话生成流程」
+// ================================================================
+let _bpmTab = "todo", _bpmDefs = [], _bpmUsers = [], _bpmDraft = null, _bpmBack = "todo";
+const BPM_STATUS_CLS = { running: "run", approved: "ok", rejected: "rej", canceled: "cancel", terminated: "cancel" };
+const BPM_ACTION_ZH = { submit: "提交", approve: "通过", reject: "驳回", transfer: "转办",
+  delegate: "委派", delegate_done: "委派处理完成", addsign_before: "前加签", addsign_after: "后加签",
+  cc: "抄送", urge: "催办", claim: "签收", revoke: "撤销", resubmit: "重新提交",
+  canceled: "已作废", auto: "自动" };
+const BPM_OPS_NEED_USER = ["transfer", "delegate", "addsign_before", "addsign_after", "cc"];
+const BPM_ROLES = [["admin", "管理员"], ["teacher", "导师"], ["member", "学生"]];
+
+function bpmEsc(v) { return esc(v === undefined || v === null ? "" : String(v)); }
+function bpmUserOptions(sel) {
+  return '<option value="">— 选择人员 —</option>' + _bpmUsers.map(u =>
+    '<option value="' + bpmEsc(u.name) + '"' + (u.name === sel ? " selected" : "") + ">" +
+    bpmEsc(u.display || u.name) + "（" + bpmEsc(u.role) + "）</option>").join("");
+}
+function bpmDefOf(id) { return _bpmDefs.find(d => d.id === id) || null; }
+function bpmFormHtml(form, def) {
+  const keys = Object.keys(form || {});
+  if (!keys.length) return '<p class="chat-hint">（无表单数据）</p>';
+  const labels = {};
+  ((def && def.form) || []).forEach(f => { labels[f.key] = f.label || f.key; });
+  return '<div class="bpm-form">' + keys.map(k =>
+    '<span class="k">' + bpmEsc(labels[k] || k) + "</span><span>" +
+    bpmEsc(String(form[k] === "" || form[k] === undefined ? "—" : form[k])) + "</span>").join("") + "</div>";
+}
+function bpmFlow(progress) {
+  if (!progress || !progress.length) return "";
+  return '<div class="fc">' + progress.map((p, i) => {
+    let cls = "g-node";
+    cls += p.state === "current" ? " cur" : (p.state === "done" ? " done" : " wait");
+    const tick = p.state === "done" ? '<span class="tick">✓</span>' : "";
+    return '<span class="' + cls + '">' + tick + bpmEsc(p.name) + "</span>" +
+      (i < progress.length - 1 ? '<span class="g-arrow">→</span>' : "");
+  }).join("") + "</div>";
+}
+function bpmHistoryHtml(h) {
+  if (!h || !h.length) return '<p class="chat-hint">暂无记录</p>';
+  return '<div class="tl">' + h.map(x => {
+    const a = x.action || "";
+    const cls = a === "reject" ? "rej" : (["approve", "submit", "resubmit"].indexOf(a) >= 0 ? "ok" : "");
+    return '<div class="tl-item ' + cls + '"><b>' + bpmEsc(x.name || BPM_ACTION_ZH[a] || a) + "</b> · " +
+      bpmEsc(BPM_ACTION_ZH[a] || a) + " · " + bpmEsc(x.actor) + " · " + bpmEsc(x.ts) +
+      (x.comment ? '<br><span class="bpm-meta">' + bpmEsc(x.comment) + "</span>" : "") + "</div>";
+  }).join("") + "</div>";
+}
+
+async function bpmBoot() {
+  const r = await post("bpm", { action: "overview" });
+  if (!r || !r.ok) { setStatus("bpm-status", (r && r.error) || "加载失败", "err"); return; }
+  _bpmDefs = r.defs || [];
+  const u = await post("bpm", { action: "users" });
+  _bpmUsers = (u && u.users) || [];
+  if (r.stats) bpmBadges(r.stats);
+  _bpmDraft = null;
+  bpmRender();
+}
+function bpmBadges(s) {
+  const set = (id, v) => { const el = $(id); if (el) el.textContent = v || 0; };
+  set("bpm-n-todo", s.todo); set("bpm-n-mine", s.mine_running); set("bpm-n-cc", s.cc);
+}
+function bpmSetTab(t) { _bpmTab = t; _bpmDraft = null; bpmRender(); }
+
+async function bpmRender() {
+  document.querySelectorAll(".bpm-tab").forEach(b => b.classList.toggle("active", b.dataset.bt === _bpmTab));
+  const box = $("bpm-body");
+  box.innerHTML = '<div class="bpm-card bpm-meta">加载中…</div>';
+  if (_bpmTab === "todo") return bpmRenderTodo();
+  if (_bpmTab === "mine") return bpmRenderList("mine");
+  if (_bpmTab === "cc") return bpmRenderCc();
+  if (_bpmTab === "start") return bpmRenderStart();
+  if (_bpmTab === "design") return bpmRenderDesign();
+  if (_bpmTab === "monitor") return bpmRenderList("monitor");
+}
+
+// ---------- 我的待办 ----------
+async function bpmRenderTodo() {
+  const box = $("bpm-body");
+  const r = await post("bpm", { action: "todo" });
+  if (!r || !r.ok) { box.innerHTML = ""; setStatus("bpm-status", (r && r.error) || "加载失败", "err"); return; }
+  if (r.stats) bpmBadges(r.stats);
+  const items = r.todo || [];
+  if (!items.length) {
+    box.innerHTML = '<div class="bpm-card"><p class="chat-hint" style="margin:0">当前没有待办任务。' +
+      '去「发起流程」提交一个审批，或等他人转办/委派给你。</p></div>';
+    return;
+  }
+  box.innerHTML = items.map(t => {
+    const canClaim = !t.claimed_by && (t.candidates || []).length > 1;
+    const b = (op, label, cls) => '<button class="' + (cls || "btn-mini") + '" data-bpm-op="' + op +
+      '" data-inst="' + t.inst_id + '" data-task="' + t.id + '">' + label + "</button>";
+    return '<div class="bpm-card">' +
+      "<h4>" + bpmEsc(t.inst_title || "（无标题）") +
+        '<span class="bpm-badge run">' + bpmEsc(t.name) + "</span></h4>" +
+      '<div class="bpm-meta">流程：' + bpmEsc(t.def_name) + " · 发起人：" + bpmEsc(t.initiator) +
+        " · " + bpmEsc(t.inst_ts) + (t.claimed_by ? " · 已认领：" + bpmEsc(t.claimed_by) : "") +
+        (t.blocked ? ' · <span style="color:var(--warn)">前加签未完成</span>' : "") + "</div>" +
+      bpmFormHtml(t.form, bpmDefOf(t.def_id)) +
+      '<textarea class="bpm-comment" style="min-height:54px" placeholder="审批意见（可选；驳回时建议填写）"></textarea>' +
+      '<div class="bpm-acts"><select class="bpm-target">' + bpmUserOptions("") + "</select>" +
+        (canClaim ? b("claim", "签收", "run") : "") +
+        b("approve", "通过", "run") + b("reject", "驳回", "run ghost") +
+        b("transfer", "转办") + b("delegate", "委派") +
+        b("addsign_before", "前加签") + b("addsign_after", "后加签") +
+        b("cc", "抄送") + b("urge", "催办") +
+        '<button class="btn-mini" data-bpm-detail="' + t.inst_id + '">流程详情</button>' +
+      "</div></div>";
+  }).join("");
+}
+
+// ---------- 我发起的 / 流程监控 ----------
+async function bpmRenderList(kind) {
+  const box = $("bpm-body");
+  const r = kind === "monitor"
+    ? await post("bpm", { action: "inst_list", all: true })
+    : await post("bpm", { action: "mine" });
+  if (!r || !r.ok) { box.innerHTML = ""; setStatus("bpm-status", (r && r.error) || "加载失败", "err"); return; }
+  const items = r.instances || [];
+  if (!items.length) {
+    box.innerHTML = '<div class="bpm-card"><p class="chat-hint" style="margin:0">' +
+      (kind === "monitor" ? "暂无流程实例。" : "你还没有发起过流程。去「发起流程」试试。") + "</p></div>";
+    return;
+  }
+  box.innerHTML = items.map(i => {
+    const mine = i.initiator === (ME && ME.name);
+    return '<div class="bpm-card">' +
+      "<h4>" + bpmEsc(i.title) + '<span class="bpm-badge ' + (BPM_STATUS_CLS[i.status] || "cancel") + '">' +
+        bpmEsc(i.status_zh) + "</span></h4>" +
+      '<div class="bpm-meta">编号 ' + bpmEsc(i.id) + " · " + bpmEsc(i.def_name) + " · 发起人：" + bpmEsc(i.initiator) +
+        " · " + bpmEsc(i.ts) + (i.end_ts ? " · 结束：" + bpmEsc(i.end_ts) : "") + "</div>" +
+      bpmFlow(i.progress) +
+      (i.cur_names && i.cur_names.length && i.status === "running"
+        ? '<div class="bpm-meta">当前节点：' + bpmEsc(i.cur_names.join("、")) +
+          (i.handlers && i.handlers.length ? " · 处理人：" + bpmEsc(i.handlers.join("、")) : "") + "</div>" : "") +
+      '<div class="bpm-acts">' +
+        '<button class="btn-mini" data-bpm-detail="' + i.id + '">流程详情</button>' +
+        (mine && i.status === "rejected" ? '<button class="run" data-bpm-resubmit="' + i.id + '">修改后重新提交</button>' : "") +
+        (i.status === "running" ? '<button class="btn-mini danger" data-bpm-revoke="' + i.id + '">撤销流程</button>' : "") +
+      "</div></div>";
+  }).join("");
+}
+
+// ---------- 我的抄送 ----------
+async function bpmRenderCc() {
+  const box = $("bpm-body");
+  const r = await post("bpm", { action: "cc" });
+  if (!r || !r.ok) { box.innerHTML = ""; setStatus("bpm-status", (r && r.error) || "加载失败", "err"); return; }
+  const items = r.cc || [];
+  if (!items.length) {
+    box.innerHTML = '<div class="bpm-card"><p class="chat-hint" style="margin:0">还没有抄送给你的流程。</p></div>';
+    return;
+  }
+  box.innerHTML = items.map(c => '<div class="bpm-card"><h4>' + bpmEsc(c.title) +
+    '<span class="bpm-badge ' + (BPM_STATUS_CLS[c.status] || "cancel") + '">' + bpmEsc(c.status || "") + "</span></h4>" +
+    '<div class="bpm-meta">' + bpmEsc(c.def_name) + " · 抄送人：" + bpmEsc(c.by) + " · " + bpmEsc(c.ts) + "</div>" +
+    '<div class="bpm-acts"><button class="btn-mini" data-bpm-detail="' + c.inst_id + '">流程详情</button></div></div>').join("");
+}
+
+// ---------- 发起流程 ----------
+function bpmStartFormHtml(def) {
+  const fs = (def && def.form) || [];
+  if (!fs.length) return '<p class="bpm-meta">该流程未定义表单字段，可直接提交。</p>';
+  return fs.map(f => {
+    const lab = bpmEsc(f.label || f.key) + (f.required ? " *" : "");
+    const attr = 'data-fk="' + bpmEsc(f.key) + '"';
+    if (f.type === "textarea")
+      return "<label>" + lab + "</label><textarea " + attr + ' style="min-height:70px"></textarea>';
+    return "<label>" + lab + "</label><input " + attr + ' type="' + (f.type === "number" ? "number" : "text") + '">';
+  }).join("");
+}
+async function bpmRenderStart() {
+  const box = $("bpm-body");
+  if (!_bpmDefs.length) {
+    box.innerHTML = '<div class="bpm-card"><p class="chat-hint" style="margin:0">还没有流程定义。' +
+      '去「流程设计」使用内置模板或新建一个。</p></div>';
+    return;
+  }
+  const sel = (_bpmDraft && _bpmDraft.def_id) || _bpmDefs[0].id;
+  const def = bpmDefOf(sel) || _bpmDefs[0];
+  box.innerHTML = '<div class="bpm-card"><h4>发起流程</h4>' +
+    '<div class="row"><div style="flex:2"><label>选择流程</label><select id="bpm-start-def">' +
+      _bpmDefs.map(d => '<option value="' + d.id + '"' + (d.id === def.id ? " selected" : "") + ">" +
+        bpmEsc(d.name) + "（" + bpmEsc(d.category) + "）</option>").join("") + "</select></div>" +
+      '<div><label>业务单号（可选）</label><input id="bpm-start-bk" placeholder="如 PAPER-2026-001"></div></div>' +
+    (def.desc ? '<p class="bpm-meta">' + bpmEsc(def.desc) + "</p>" : "") +
+    bpmFlow((def.nodes || []).filter(n => n.type !== "end").map(n => {
+      return { name: n.name, state: n.type === "start" ? "current" : "pending" };
+    })) +
+    '<div id="bpm-start-form">' + bpmStartFormHtml(def) + "</div>" +
+    '<div class="bpm-acts"><button class="run" id="bpm-start-go">提交发起</button>' +
+      '<span class="bpm-meta">提交后生成流程实例，并推送给首个审批节点</span></div></div>';
+  $("bpm-start-def").addEventListener("change", () => {
+    _bpmDraft = { def_id: $("bpm-start-def").value };
+    bpmRenderStart();
+  });
+  $("bpm-start-go").addEventListener("click", async () => {
+    const defId = $("bpm-start-def").value;
+    const form = {};
+    document.querySelectorAll("#bpm-start-form [data-fk]").forEach(el => {
+      form[el.dataset.fk] = (el.value || "").trim();
+    });
+    setStatus("bpm-status", "提交中…");
+    const r = await post("bpm", {
+      action: "start", def_id: defId, title: form.title || "", form: form,
+      business_key: ($("bpm-start-bk") || {}).value || ""
+    });
+    if (!r || !r.ok) { setStatus("bpm-status", (r && r.error) || "发起失败", "err"); return; }
+    setStatus("bpm-status", "已发起流程 " + r.instance.id + "，已推送至首个审批节点", "ok");
+    const t = await post("bpm", { action: "todo" });
+    if (t && t.stats) bpmBadges(t.stats);
+    _bpmTab = "mine";
+    bpmRender();
+  });
+}
+
+// ---------- 流程设计 ----------
+async function bpmRenderDesign() {
+  const box = $("bpm-body");
+  if (_bpmDraft) return bpmRenderEditor();
+  const r = await post("bpm", { action: "defs" });
+  const defs = (r && r.defs) || _bpmDefs;
+  _bpmDefs = defs;
+  box.innerHTML = '<div class="bpm-card"><h4>流程定义' +
+    '<span class="bpm-meta" style="font-weight:400">　共 ' + defs.length + " 个</span></h4>" +
+    '<div class="bpm-acts" style="margin-bottom:8px">' +
+      '<button class="run" id="bpm-new">＋ 新建流程</button>' +
+      '<input id="bpm-ai-text" placeholder="或用一句话描述审批场景，AI 生成草稿" style="flex:2;min-width:220px">' +
+      '<button class="btn-mini" id="bpm-ai-gen">AI 生成</button></div>' +
+    '<table class="tbl"><tr><th>名称</th><th>分类</th><th>节点</th><th>实例</th><th>来源</th><th>操作</th></tr>' +
+    defs.map(d => "<tr><td>" + bpmEsc(d.name) + "</td><td>" + bpmEsc(d.category) + "</td><td>" +
+      (d.nodes || []).length + "</td><td>" + (d.inst_count || 0) + "</td><td>" +
+      (d.builtin ? "内置模板" : "自建") + "</td><td>" +
+      '<button class="btn-mini" data-bpm-edit="' + d.id + '">编辑</button>' +
+      '<button class="btn-mini" data-bpm-copy="' + d.id + '">复制</button>' +
+      '<button class="btn-mini danger" data-bpm-del="' + d.id + '">删除</button>' +
+      "</td></tr>").join("") + "</table></div>";
+  $("bpm-new").addEventListener("click", () => {
+    _bpmDraft = { name: "", category: "通用", desc: "",
+      form: [{ key: "title", label: "标题", type: "text", required: true },
+             { key: "detail", label: "说明", type: "textarea", required: false }],
+      nodes: [{ id: "n1", type: "start", name: "提交" },
+              { id: "n2", type: "approve", name: "审批", assignee_type: "role", assignee: "admin",
+                sign_mode: "or", allow_reject: true, reject_to: "initiator" },
+              { id: "n3", type: "end", name: "结束" }],
+      edges: [{ from: "n1", to: "n2" }, { from: "n2", to: "n3" }], cc_on_end: [] };
+    bpmRenderEditor();
+  });
+  $("bpm-ai-gen").addEventListener("click", async () => {
+    const text = ($("bpm-ai-text") || {}).value || "";
+    setStatus("bpm-status", "AI 生成流程草稿中…");
+    const a = await post("bpm", { action: "ai_gen", text: text });
+    if (!a || !a.ok) { setStatus("bpm-status", (a && a.error) || "AI 生成失败", "err"); return; }
+    _bpmDraft = a.draft;
+    setStatus("bpm-status", "已生成草稿，请核对后保存", "ok");
+    bpmRenderEditor();
+  });
+  box.querySelectorAll("[data-bpm-edit]").forEach(b => b.addEventListener("click", async () => {
+    const r2 = await post("bpm", { action: "def_get", id: b.dataset.bpmEdit });
+    if (!r2 || !r2.ok) { setStatus("bpm-status", (r2 && r2.error) || "读取失败", "err"); return; }
+    _bpmDraft = JSON.parse(JSON.stringify(r2.def));
+    bpmRenderEditor();
+  }));
+  box.querySelectorAll("[data-bpm-copy]").forEach(b => b.addEventListener("click", async () => {
+    const r2 = await post("bpm", { action: "def_get", id: b.dataset.bpmCopy });
+    if (!r2 || !r2.ok) return;
+    const d = JSON.parse(JSON.stringify(r2.def));
+    delete d.id; d.builtin = false; d.name = d.name + "·副本";
+    _bpmDraft = d;
+    bpmRenderEditor();
+  }));
+  box.querySelectorAll("[data-bpm-del]").forEach(b => b.addEventListener("click", async () => {
+    if (!confirm("确认删除该流程定义？（不影响已产生的流程实例）")) return;
+    const r2 = await post("bpm", { action: "def_remove", id: b.dataset.bpmDel });
+    if (!r2 || !r2.ok) { setStatus("bpm-status", (r2 && r2.error) || "删除失败", "err"); return; }
+    setStatus("bpm-status", "已删除", "ok");
+    _bpmDraft = null;
+    bpmRender();
+  }));
+}
+
+function bpmAssigneeCtrl(node, cls) {
+  const t = node.assignee_type || "role";
+  if (t === "initiator") return '<select class="' + cls + '" disabled><option>发起人本人</option></select>';
+  if (t === "user") return '<select class="' + cls + '">' + bpmUserOptions(node.assignee || "") + "</select>";
+  return '<select class="' + cls + '">' + BPM_ROLES.map(r =>
+    '<option value="' + r[0] + '"' + (node.assignee === r[0] ? " selected" : "") + ">" + r[1] + "</option>").join("") + "</select>";
+}
+function bpmRenderEditor() {
+  const box = $("bpm-body");
+  const d = _bpmDraft;
+  const nodes = d.nodes || [];
+  const appr = nodes.filter(n => n.type === "approve");
+  box.innerHTML = '<div class="bpm-card"><h4>' + (d.id ? "编辑流程" : "新建流程") + "</h4>" +
+    '<div class="row"><div style="flex:2"><label>流程名称</label><input id="bd-name" value="' + bpmEsc(d.name) + '" placeholder="如：论文送审审批"></div>' +
+    '<div><label>分类</label><input id="bd-cat" value="' + bpmEsc(d.category || "通用") + '" placeholder="论文/开题/实验/通用"></div></div>' +
+    "<label>说明</label><input id=\"bd-desc\" value=\"" + bpmEsc(d.desc || "") + '" placeholder="一句话说明该流程用途">' +
+
+    '<h4 style="margin-top:14px">① 表单字段 <span class="bpm-meta" style="font-weight:400">（发起流程时填写；key 用英文）</span></h4>' +
+    '<div id="bd-form"></div>' +
+    '<div class="bpm-acts"><button class="btn-mini" id="bd-form-add">＋ 添加字段</button></div>' +
+
+    '<h4 style="margin-top:14px">② 审批节点 <span class="bpm-meta" style="font-weight:400">（按顺序流转；「条件」满足则进入下一节点，否则直接结束）</span></h4>' +
+    '<div id="bd-nodes"></div>' +
+    '<div class="bpm-acts"><button class="btn-mini" id="bd-node-add">＋ 添加审批节点</button></div>' +
+
+    '<h4 style="margin-top:14px">③ 结束后抄送 <span class="bpm-meta" style="font-weight:400">（可选）</span></h4>' +
+    '<select id="bd-cc" multiple size="3" style="min-height:64px">' + bpmUserOptions("") + "</select>" +
+
+    '<div class="bpm-acts" style="margin-top:14px">' +
+      '<button class="run" id="bd-save">保存流程</button>' +
+      '<button class="btn-mini" id="bd-cancel">取消</button>' +
+      '<span class="bpm-meta">保存后即可在「发起流程」中选择</span></div></div>';
+
+  function redrawForm() {
+    const box2 = $("bd-form");
+    const fs = d.form || [];
+    box2.innerHTML = fs.map((f, i) =>
+      '<div class="bpm-node-row" data-fi="' + i + '"><span class="idx">' + (i + 1) + "</span>" +
+      '<input class="bf-label" value="' + bpmEsc(f.label || "") + '" placeholder="字段名">' +
+      '<input class="bf-key" value="' + bpmEsc(f.key || "") + '" placeholder="key（英文）">' +
+      '<select class="bf-type">' + [["text", "单行文本"], ["textarea", "多行文本"], ["number", "数字"]]
+        .map(t => '<option value="' + t[0] + '"' + (f.type === t[0] ? " selected" : "") + ">" + t[1] + "</option>").join("") + "</select>" +
+      '<select class="bf-req"><option value="0"' + (f.required ? "" : " selected") + ">选填</option>" +
+        '<option value="1"' + (f.required ? " selected" : "") + ">必填</option></select>" +
+      '<button class="btn-mini danger" data-bf-del="' + i + '">✕</button></div>').join("") ||
+      '<p class="bpm-meta">还没有字段</p>';
+    box2.querySelectorAll("[data-bf-del]").forEach(b => b.addEventListener("click", () => {
+      d.form.splice(+b.dataset.bfDel, 1); redrawForm();
+    }));
+  }
+  function collectForm() {
+    const out = [];
+    $("bd-form").querySelectorAll(".bpm-node-row").forEach(r => {
+      const key = r.querySelector(".bf-key").value.trim();
+      const label = r.querySelector(".bf-label").value.trim() || key;
+      if (!key) return;
+      out.push({ key: key, label: label, type: r.querySelector(".bf-type").value,
+                 required: r.querySelector(".bf-req").value === "1" });
+    });
+    d.form = out;
+  }
+  function redrawNodes() {
+    const box3 = $("bd-nodes");
+    const list = (d.nodes || []).filter(n => n.type === "approve");
+    box3.innerHTML = list.map((n, i) => {
+      const realIdx = (d.nodes || []).indexOf(n);
+      return '<div class="bpm-node-row" style="grid-template-columns:26px 1.2fr .8fr 1fr .7fr .8fr .8fr 28px 28px" data-ni="' + realIdx + '">' +
+        '<span class="idx">' + (i + 1) + "</span>" +
+        '<input class="bn-name" value="' + bpmEsc(n.name || "") + '" placeholder="节点名称">' +
+        '<select class="bn-atype">' + [["role", "按角色"], ["user", "指定人"], ["initiator", "发起人"]]
+          .map(t => '<option value="' + t[0] + '"' + ((n.assignee_type || "role") === t[0] ? " selected" : "") + ">" + t[1] + "</option>").join("") + "</select>" +
+        bpmAssigneeCtrl(n, "bn-assignee") +
+        '<select class="bn-sign"><option value="or"' + ((n.sign_mode || "or") === "or" ? " selected" : "") + ">或签</option>" +
+          '<option value="and"' + (n.sign_mode === "and" ? " selected" : "") + ">会签</option></select>" +
+        '<select class="bn-reject"><option value="initiator"' + ((n.reject_to || "initiator") === "initiator" ? " selected" : "") + ">驳回→发起人</option>" +
+          '<option value="prev"' + (n.reject_to === "prev" ? " selected" : "") + ">驳回→上一节点</option>" +
+          '<option value="none"' + (n.reject_to === "none" ? " selected" : "") + ">不允许驳回</option></select>" +
+        '<input class="bn-cond" value="' + bpmEsc(n._cond || "") + '" placeholder="条件(可选)">' +
+        '<button class="btn-mini" data-bn-up="' + realIdx + '">↑</button>' +
+        '<button class="btn-mini danger" data-bn-del="' + realIdx + '">✕</button></div>';
+    }).join("") || '<p class="bpm-meta">还没有审批节点</p>';
+    // 交换顺序
+    box3.querySelectorAll("[data-bn-up]").forEach(b => b.addEventListener("click", () => {
+      collectNodes();
+      const idx = +b.dataset.bnUp;
+      const real = (d.nodes || [])[idx];
+      const pos = (d.nodes || []).findIndex(n => n.type === "approve");
+      if (real && pos >= 0 && idx > pos) {
+        d.nodes.splice(idx, 1); d.nodes.splice(idx - 1, 0, real);
+      }
+      redrawNodes();
+    }));
+    box3.querySelectorAll("[data-bn-del]").forEach(b => b.addEventListener("click", () => {
+      collectNodes();
+      d.nodes.splice(+b.dataset.bnDel, 1);
+      redrawNodes();
+    }));
+    // 审批人类型联动
+    box3.querySelectorAll(".bn-atype").forEach(s => s.addEventListener("change", () => {
+      collectNodes();
+      const row = s.closest(".bpm-node-row");
+      const idx = +row.dataset.ni;
+      const nd = d.nodes[idx];
+      nd.assignee_type = s.value;
+      nd.assignee = s.value === "role" ? "admin" : (s.value === "initiator" ? "" : (nd.assignee || ""));
+      redrawNodes();
+    }));
+  }
+  function collectNodes() {
+    const box3 = $("bd-nodes");
+    box3.querySelectorAll(".bpm-node-row").forEach(r => {
+      const idx = +r.dataset.ni;
+      const nd = (d.nodes || [])[idx];
+      if (!nd) return;
+      nd.name = r.querySelector(".bn-name").value.trim() || nd.name;
+      nd.assignee_type = r.querySelector(".bn-atype").value;
+      nd.assignee = (r.querySelector(".bn-assignee") || {}).value || "";
+      nd.sign_mode = r.querySelector(".bn-sign").value;
+      const rj = r.querySelector(".bn-reject").value;
+      nd.reject_to = rj === "prev" ? "__prev__" : (rj === "none" ? "__none__" : "initiator");
+      nd.allow_reject = rj !== "none";
+      nd._cond = r.querySelector(".bn-cond").value.trim();
+    });
+  }
+  function buildEdges() {
+    collectNodes();
+    const appr = (d.nodes || []).filter(n => n.type === "approve");
+    const start = (d.nodes || []).find(n => n.type === "start");
+    const end = (d.nodes || []).find(n => n.type === "end");
+    if (!start || !end) return;
+    // 把「Radio 枚举」翻译成真实 reject_to / 条件连线
+    appr.forEach((n, i) => {
+      if (n.reject_to === "__prev__") n.reject_to = i > 0 ? appr[i - 1].id : "initiator";
+      else if (n.reject_to === "__none__") n.reject_to = "initiator";
+    });
+    const edges = [];
+    edges.push({ from: start.id, to: appr[0] ? appr[0].id : end.id });
+    appr.forEach((n, i) => {
+      const nxt = appr[i + 1] ? appr[i + 1].id : end.id;
+      const cond = n._cond || "";
+      edges.push(cond ? { from: n.id, to: nxt, cond: cond } : { from: n.id, to: nxt });
+      if (cond) edges.push({ from: n.id, to: end.id, cond: "" });   // 不满足条件则直接结束
+      delete n._cond;
+    });
+    d.edges = edges;
+  }
+
+  redrawForm();
+  redrawNodes();
+  $("bd-form-add").addEventListener("click", () => {
+    collectForm();
+    (d.form = d.form || []).push({ key: "", label: "", type: "text", required: false });
+    redrawForm();
+  });
+  $("bd-node-add").addEventListener("click", () => {
+    collectNodes();
+    const appr = (d.nodes || []).filter(n => n.type === "approve");
+    const start = (d.nodes || []).find(n => n.type === "start");
+    const end = (d.nodes || []).find(n => n.type === "end");
+    if (!start || !end) { setStatus("bpm-status", "流程缺少开始或结束节点", "err"); return; }
+    let k = 2;
+    const used = (d.nodes || []).map(n => n.id);
+    while (used.indexOf("n" + k) >= 0) k++;
+    const nid = "n" + k;
+    const endPos = (d.nodes || []).indexOf(end);
+    (d.nodes || []).splice(endPos, 0, {
+      id: nid, type: "approve", name: "新审批节点", assignee_type: "role",
+      assignee: "admin", sign_mode: "or", allow_reject: true, reject_to: "initiator"
+    });
+    redrawNodes();
+  });
+  $("bd-cancel").addEventListener("click", () => { _bpmDraft = null; bpmRender(); });
+  $("bd-save").addEventListener("click", async () => {
+    collectForm();
+    collectNodes();
+    buildEdges();
+    d.name = $("bd-name").value.trim();
+    d.category = $("bd-cat").value.trim() || "通用";
+    d.desc = $("bd-desc").value.trim();
+    d.cc_on_end = Array.from($("bd-cc").selectedOptions).map(o => o.value).filter(Boolean);
+    if (!d.name) { setStatus("bpm-status", "流程名称不能为空", "err"); return; }
+    if (!(d.nodes || []).some(n => n.type === "approve")) {
+      setStatus("bpm-status", "至少需要一个审批节点", "err"); return;
+    }
+    setStatus("bpm-status", "保存中…");
+    const r = await post("bpm", { action: "def_save", def: d });
+    if (!r || !r.ok) { setStatus("bpm-status", (r && r.error) || "保存失败", "err"); return; }
+    setStatus("bpm-status", "流程已保存", "ok");
+    _bpmDraft = null;
+    _bpmDefs = r.defs || _bpmDefs;
+    bpmRender();
+  });
+}
+
+// ---------- 流程详情 ----------
+async function bpmRenderInstance(iid) {
+  const box = $("bpm-body");
+  const r = await post("bpm", { action: "inst", id: iid });
+  if (!r || !r.ok) { box.innerHTML = ""; setStatus("bpm-status", (r && r.error) || "读取失败", "err"); return; }
+  const i = r.instance, prog = r.progress || [];
+  box.innerHTML = '<div class="bpm-card">' +
+    '<div class="bpm-acts" style="margin:0 0 8px"><button class="btn-mini" id="bpm-back">← 返回</button>' +
+      (i.can_manage && i.status === "rejected" ? '<button class="run" id="bpm-resubmit">修改后重新提交</button>' : "") +
+      (i.can_manage && i.status === "running" ? '<button class="btn-mini danger" id="bpm-revoke">撤销流程</button>' : "") +
+    "</div>" +
+    "<h4>" + bpmEsc(i.title) + '<span class="bpm-badge ' + (BPM_STATUS_CLS[i.status] || "cancel") + '">' +
+      bpmEsc(i.status_zh) + "</span></h4>" +
+    '<div class="bpm-meta">编号 ' + bpmEsc(i.id) + " · 流程：" + bpmEsc(i.def_name) + " · 发起人：" + bpmEsc(i.initiator) +
+      " · 发起于 " + bpmEsc(i.ts) + (i.end_ts ? " · 结束于 " + bpmEsc(i.end_ts) : "") +
+      (i.business_key ? " · 单号：" + bpmEsc(i.business_key) : "") + "</div>" +
+    bpmFlow(prog) +
+    (i.handlers && i.handlers.length && i.status === "running"
+      ? '<div class="bpm-meta">当前处理人：' + bpmEsc(i.handlers.join("、")) + "</div>" : "") +
+    '<h4 style="margin-top:14px">表单数据</h4>' + bpmFormHtml(i.form, bpmDefOf(i.def_id)) +
+    '<h4 style="margin-top:14px">审批历史</h4>' + bpmHistoryHtml(i.history) +
+    ((i.cc || []).length ? '<h4 style="margin-top:14px">抄送记录</h4><div class="tl">' +
+      i.cc.map(c => '<div class="tl-item">抄送 <b>' + bpmEsc((c.users || []).join("、")) + "</b> · " +
+        bpmEsc(c.by) + " · " + bpmEsc(c.ts) + "</div>").join("") + "</div>" : "") +
+    "</div>";
+  $("bpm-back").addEventListener("click", () => { _bpmTab = _bpmBack; bpmRender(); });
+  const rv = $("bpm-revoke");
+  if (rv) rv.addEventListener("click", async () => {
+    if (!confirm("确认撤销该流程？撤销后不可恢复。")) return;
+    const rr = await post("bpm", { action: "revoke", inst_id: iid });
+    if (!rr || !rr.ok) { setStatus("bpm-status", (rr && rr.error) || "撤销失败", "err"); return; }
+    setStatus("bpm-status", "流程已撤销", "ok");
+    bpmRenderInstance(iid);
+  });
+  const rs = $("bpm-resubmit");
+  if (rs) rs.addEventListener("click", async () => {
+    const rr = await post("bpm", { action: "resubmit", inst_id: iid });
+    if (!rr || !rr.ok) { setStatus("bpm-status", (rr && rr.error) || "重新提交失败", "err"); return; }
+    setStatus("bpm-status", "已重新提交，回到首个审批节点", "ok");
+    bpmRenderInstance(iid);
+  });
+}
+
+// ---------- 事件绑定（一次性） ----------
+function bpmBind() {
+  const tabs = $("bpm-tabs");
+  if (tabs) tabs.addEventListener("click", ev => {
+    const b = ev.target.closest(".bpm-tab");
+    if (b) bpmSetTab(b.dataset.bt);
+  });
+  const body = $("bpm-body");
+  if (!body) return;
+  body.addEventListener("click", async ev => {
+    const dbtn = ev.target.closest("[data-bpm-detail]");
+    if (dbtn) {
+      _bpmBack = _bpmTab;
+      return bpmRenderInstance(dbtn.dataset.bpmDetail);
+    }
+    const rv = ev.target.closest("[data-bpm-revoke]");
+    if (rv) {
+      if (!confirm("确认撤销该流程？")) return;
+      const r = await post("bpm", { action: "revoke", inst_id: rv.dataset.bpmRevoke });
+      if (!r || !r.ok) { setStatus("bpm-status", (r && r.error) || "撤销失败", "err"); return; }
+      setStatus("bpm-status", "流程已撤销", "ok");
+      return bpmRender();
+    }
+    const rs = ev.target.closest("[data-bpm-resubmit]");
+    if (rs) {
+      const r = await post("bpm", { action: "resubmit", inst_id: rs.dataset.bpmResubmit });
+      if (!r || !r.ok) { setStatus("bpm-status", (r && r.error) || "提交失败", "err"); return; }
+      setStatus("bpm-status", "已重新提交，回到首个审批节点", "ok");
+      return bpmRender();
+    }
+    const btn = ev.target.closest("button[data-bpm-op]");
+    if (!btn) return;
+    const card = btn.closest(".bpm-card");
+    const op = btn.dataset.bpmOp;
+    const comment = ((card && card.querySelector(".bpm-comment")) || {}).value || "";
+    const target = ((card && card.querySelector(".bpm-target")) || {}).value || "";
+    if (BPM_OPS_NEED_USER.indexOf(op) >= 0 && !target) {
+      setStatus("bpm-status", "请先在下拉框选择人员，再点「" + (BPM_ACTION_ZH[op] || op) + "」", "err");
+      return;
+    }
+    if (op === "reject" && !comment.trim() && !confirm("未填写驳回意见，确定继续？")) return;
+    const payload = { action: "act", inst_id: btn.dataset.inst, task_id: btn.dataset.task, op: op, comment: comment };
+    if (op === "transfer" || op === "delegate") payload.to = target;
+    if (["addsign_before", "addsign_after", "cc"].indexOf(op) >= 0) payload.users = [target];
+    btn.disabled = true;
+    const r = await post("bpm", payload);
+    btn.disabled = false;
+    if (!r || !r.ok) { setStatus("bpm-status", (r && r.error) || "操作失败", "err"); return; }
+    setStatus("bpm-status", (BPM_ACTION_ZH[op] || op) + "成功", "ok");
+    if (op === "cc" || op === "urge") {
+      const t = await post("bpm", { action: "todo" });
+      if (t && t.stats) bpmBadges(t.stats);
+      return;
+    }
+    const t = await post("bpm", { action: "todo" });
+    if (t && t.stats) bpmBadges(t.stats);
+    bpmRender();
+  });
+}
+bpmBind();

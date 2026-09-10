@@ -167,6 +167,35 @@
   .g-node.done{border-color:var(--ok);background:rgba(22,163,74,.10)}
   .g-node.done .tick{color:var(--ok);font-weight:700}
   .g-arrow{color:var(--muted);font-size:13px}
+  /* ---------- 流程中心（BPM） ---------- */
+  .bpm-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 0}
+  .bpm-tab{background:var(--panel2);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:12.5px;cursor:pointer;transition:.15s}
+  .bpm-tab:hover{border-color:var(--accent);color:var(--accent)}
+  .bpm-tab.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+  .pill{display:inline-block;min-width:16px;padding:0 5px;margin-left:4px;border-radius:9px;background:var(--accent);color:#fff;font-size:11px;line-height:16px;text-align:center}
+  .bpm-card{border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-top:10px;background:var(--panel)}
+  .bpm-card h4{margin:0 0 6px}
+  .bpm-meta{color:var(--muted);font-size:12px;margin:2px 0}
+  .fc{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin:8px 0}
+  .g-node.cur{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .g-node.wait{opacity:.5}
+  .g-node.rej{border-color:var(--err);background:rgba(220,38,38,.10);color:var(--err)}
+  .tl{border-left:2px solid var(--border);margin:8px 0 0 6px;padding-left:12px}
+  .tl-item{position:relative;padding:4px 0;font-size:12.5px}
+  .tl-item:before{content:"";position:absolute;left:-19px;top:11px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+  .tl-item.rej:before{background:var(--err)}
+  .tl-item.ok:before{background:var(--ok)}
+  .bpm-form{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12.5px;margin:6px 0}
+  .bpm-form .k{color:var(--muted);white-space:nowrap}
+  .bpm-acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center}
+  .bpm-badge{display:inline-block;padding:1px 7px;border-radius:6px;font-size:11.5px;border:1px solid var(--border);margin-left:6px}
+  .bpm-badge.run{color:var(--accent);border-color:var(--accent)}
+  .bpm-badge.ok{color:var(--ok);border-color:var(--ok)}
+  .bpm-badge.rej{color:var(--err);border-color:var(--err)}
+  .bpm-badge.cancel{color:var(--muted)}
+  .bpm-node-row{display:grid;grid-template-columns:26px 1fr 1.1fr .9fr .7fr 28px;gap:6px;align-items:center;margin:4px 0}
+  .bpm-node-row input,.bpm-node-row select{margin:0}
+  .bpm-node-row .idx{color:var(--muted);font-size:12px;text-align:center}
   /* 侧栏折叠分组 */
   .nav-head{
     display:flex;align-items:center;justify-content:space-between;width:100%;text-align:left;
@@ -273,6 +302,12 @@
           <button data-tab="collab">合作对接</button>
           <button data-tab="team">协作中心</button>
           <button data-tab="reviewhub">评审工作台</button>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button class="nav-head">🔀 流程与审批<span class="caret">▾</span></button>
+        <div class="nav-sub">
+          <button data-tab="bpm">流程中心</button>
         </div>
       </div>
       <div class="nav-group">
@@ -1024,6 +1059,23 @@
           <span class="status" id="vh-submit-status"></span>
         </div>
       </div>
+    </section>
+
+    <!-- 流程中心（BPM 审批流转） -->
+    <section data-pane="bpm" class="hidden">
+      <div class="card">
+        <h3 style="margin-top:0">流程中心 <span style="font-weight:400;color:var(--muted);font-size:12px">（审批流转：流程定义 → 发起 → 待办审批 → 流程跟踪；能力对齐 JeecgBoot/Flowable，引擎为确定性逻辑，不依赖 AI）</span></h3>
+        <div class="bpm-tabs" id="bpm-tabs">
+          <button class="bpm-tab active" data-bt="todo">我的待办<span class="pill" id="bpm-n-todo">0</span></button>
+          <button class="bpm-tab" data-bt="mine">我发起的<span class="pill" id="bpm-n-mine">0</span></button>
+          <button class="bpm-tab" data-bt="cc">我的抄送<span class="pill" id="bpm-n-cc">0</span></button>
+          <button class="bpm-tab" data-bt="start">发起流程</button>
+          <button class="bpm-tab" data-bt="design">流程设计</button>
+          <button class="bpm-tab" data-bt="monitor">流程监控</button>
+        </div>
+        <span class="status" id="bpm-status"></span>
+      </div>
+      <div id="bpm-body"></div>
     </section>
 
     <!-- 写作综述 -->

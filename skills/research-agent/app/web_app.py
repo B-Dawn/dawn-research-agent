@@ -42,6 +42,7 @@ import team_store as store  # noqa: E402
 import model_bridge as model  # noqa: E402
 import auth  # noqa: E402
 import workbench as wb  # noqa: E402
+import bpm  # noqa: E402  流程引擎（JeecgBoot/Flowable 风格 BPM）
 
 # 服务端内存：保存最近一次检索结果，供「对比矩阵」直接使用
 _LAST_SEARCH = {"query": "", "records": []}
@@ -51,7 +52,7 @@ ADMIN_ONLY_APIS = ("model_set",)
 
 STATIC_DIR = HERE
 INDEX_FILE = os.path.join(STATIC_DIR, "index.html")
-APP_VERSION = "0.8.0"  # 版本号唯一来源：改这里，页面（标题/登录页/侧栏）自动同步
+APP_VERSION = "0.9.0"  # 版本号唯一来源：改这里，页面（标题/登录页/侧栏）自动同步
 APPJS_FILE = os.path.join(STATIC_DIR, "app.js")
 
 
@@ -1060,6 +1061,143 @@ def api_workflow(params):
     return {"ok": True, **wb.wf_get_direction(by)}
 
 
+def _bpm_inst_view(i):
+    """列表用的精简实例视图。"""
+    defn = bpm.def_get(i.get("def_id"))
+    cur_names = []
+    for nid in (i.get("cur") or []):
+        nd = bpm._node(defn, nid) if defn else None
+        cur_names.append((nd or {}).get("name") or nid)
+    handlers, seen = [], set()
+    for t in i.get("tasks", []):
+        if t.get("status") != "todo":
+            continue
+        for u in (t.get("assignees") or []) + ([t["delegated_to"]] if t.get("delegated_to") else []):
+            if u and u not in seen:
+                seen.add(u)
+                handlers.append(u)
+    return {
+        "id": i.get("id"), "def_id": i.get("def_id"), "def_name": i.get("def_name"),
+        "category": i.get("category"), "title": i.get("title"),
+        "business_key": i.get("business_key"), "form": i.get("form"),
+        "initiator": i.get("initiator"), "status": i.get("status"),
+        "status_zh": bpm.STATUS_ZH.get(i.get("status"), i.get("status")),
+        "ts": i.get("ts"), "end_ts": i.get("end_ts"),
+        "cur_names": cur_names, "handlers": handlers, "progress": bpm.progress(i),
+        "cc": i.get("cc") or [], "task_count": len(i.get("tasks") or []),
+    }
+
+
+def _bpm_ai_gen(params):
+    """可选增强：一句话生成流程定义。
+
+    注意：流程引擎本身**不需要 AI**；此处模型不可用时只提示，不影响手工配置与内置模板。
+    """
+    if not model.status()["ok"]:
+        return {"ok": False, "ai": False,
+                "error": "AI 生成流程需要配置模型（当前不可用）。"
+                         "可先直接用内置模板，或在「流程设计」里手工配置——流程引擎不需要 AI。"}
+    text = (params.get("text") or "").strip()
+    if len(text) < 6:
+        return {"ok": False, "error": "请描述审批场景（≥6 字），例如「论文投稿需要导师和学院两级审批」"}
+    sys_p = ("你是 BPM 流程设计助手。用户用自然语言描述一个审批场景，你返回 STRICT JSON（无代码栅栏）："
+             '{"name":"流程名（≤10字）","category":"分类（如 论文/开题/实验/通用）",'
+             '"desc":"一句话说明","nodes":["节点1名","节点2名",...],'
+             '"role":"审批角色（admin/teacher/member 三选一，默认 admin）"}。'
+             "nodes 只列需要人工审批的节点（2-5 个），不要包含开始/结束。用中文。")
+    try:
+        raw = model.quick_ask(text[:2000], system=sys_p, max_tokens=1000, temperature=0.3)
+        data = json.loads(re.search(r"\{.*\}", raw, re.S).group(0))
+    except Exception as e:
+        return {"ok": False, "error": "AI 返回解析失败（可重试）：%s" % e}
+    names = [str(x).strip() for x in (data.get("nodes") or []) if str(x).strip()][:6]
+    if not names:
+        return {"ok": False, "error": "AI 未给出有效审批节点，请换一种说法描述"}
+    role = data.get("role") if data.get("role") in ("admin", "teacher", "member") else "admin"
+    nodes = [{"id": "n1", "type": "start", "name": "提交"}]
+    edges = []
+    for idx, nm in enumerate(names, start=2):
+        nodes.append({"id": "n%d" % idx, "type": "approve", "name": nm,
+                      "assignee_type": "role", "assignee": role, "sign_mode": "or",
+                      "allow_reject": True, "reject_to": "initiator"})
+        edges.append({"from": "n%d" % (idx - 1), "to": "n%d" % idx})
+    end_id = "n%d" % (len(nodes) + 1)
+    nodes.append({"id": end_id, "type": "end", "name": "结束"})
+    edges.append({"from": "n%d" % (len(nodes) - 1), "to": end_id})
+    return {"ok": True, "draft": {
+        "name": (data.get("name") or ("AI流程·" + text[:10]))[:20],
+        "category": (data.get("category") or "AI生成")[:10],
+        "desc": (data.get("desc") or text)[:200],
+        "form": [{"key": "title", "label": "标题", "type": "text", "required": True},
+                 {"key": "detail", "label": "说明", "type": "textarea", "required": False}],
+        "nodes": nodes, "edges": edges, "cc_on_end": []}}
+
+
+def api_bpm(params):
+    """流程中心（参照 JeecgBoot/Flowable）：定义 / 发起 / 待办 / 审批 / 驳回 / 转办 / 委派 / 加签 / 抄送 / 跟踪。"""
+    action = params.get("action") or "overview"
+    by = _who(params)
+    admin = (params.get("_user") or {}).get("role") == "admin"
+    if action == "overview":
+        return {"ok": True, "stats": bpm.stats(by, admin), "todo": bpm.todo(by),
+                "defs": bpm.def_list(by), "mine": [_bpm_inst_view(i)
+                                                    for i in bpm.mine(by)[:10]]}
+    if action == "defs":
+        return {"ok": True, "defs": bpm.def_list(by)}
+    if action == "def_get":
+        d = bpm.def_get(params.get("id"))
+        return {"ok": bool(d), "def": d, "error": "" if d else "流程定义不存在"}
+    if action == "def_save":
+        return bpm.def_save(by, params.get("def") or {k: v for k, v in params.items()
+                                                     if k not in ("action", "_user", "_token")})
+    if action == "def_remove":
+        if not admin:
+            return {"ok": False, "error": "仅管理员可删除流程定义"}
+        return bpm.def_remove(params.get("id"))
+    if action == "start":
+        return bpm.wf_start(params.get("def_id"), by, params.get("title"),
+                            params.get("form") or {}, params.get("business_key") or "")
+    if action == "todo":
+        return {"ok": True, "todo": bpm.todo(by), "stats": bpm.stats(by, admin)}
+    if action == "mine":
+        return {"ok": True, "instances": [_bpm_inst_view(i) for i in bpm.mine(by)]}
+    if action == "done":
+        return {"ok": True, "done": bpm.done_list(by)}
+    if action == "cc":
+        return {"ok": True, "cc": bpm.cc_list(by)}
+    if action == "inst_list":
+        items = bpm.inst_list(by, all_=admin and bool(params.get("all")))
+        return {"ok": True, "instances": [_bpm_inst_view(i) for i in items]}
+    if action == "inst":
+        i = bpm.inst_get(params.get("id"))
+        if not i:
+            return {"ok": False, "error": "流程实例不存在"}
+        v = _bpm_inst_view(i)
+        v["history"] = i.get("history") or []
+        v["tasks"] = i.get("tasks") or []
+        v["can_manage"] = admin or i.get("initiator") == by
+        return {"ok": True, "instance": v, "progress": bpm.progress(i)}
+    if action == "act":
+        return bpm.act(params.get("inst_id"), params.get("task_id"), by,
+                       params.get("op") or "approve", params.get("comment") or "",
+                       {"to": params.get("to"), "users": params.get("users") or []},
+                       is_admin=admin)
+    if action == "revoke":
+        return bpm.revoke(params.get("inst_id"), by, is_admin=admin)
+    if action == "resubmit":
+        return bpm.resubmit(params.get("inst_id"), by, params.get("form"))
+    if action == "users":
+        us = auth.list_users()
+        return {"ok": True, "users": [{"name": u.get("name"), "role": u.get("role"),
+                                       "display": u.get("display") or u.get("name")}
+                                      for u in us if u.get("active", True)]}
+    if action == "status_zh":
+        return {"ok": True, "status": bpm.STATUS_ZH, "action": bpm.ACTION_ZH}
+    if action == "ai_gen":
+        return _bpm_ai_gen(params)
+    return {"ok": False, "error": "未知操作 %s" % action}
+
+
 def api_dataset(params):
     """实验数据集：从论文/开题提取数据集名 → Zenodo 检索 → 下载。"""
     action = params.get("action") or "search"
@@ -1399,7 +1537,8 @@ HELP_TEXT = (
     "- 粘贴个人简历或擅长技术 → 我按十步走帮你定研究方向\n"
     "- 确认方向：<最终方向>（定稿后进入文献调研）\n"
     "- 记住：实验一律先跑 3 个随机种子（写入长期记忆）\n"
-    "- 查看记忆 / 删除记忆 <关键词> / 我的论文"
+    "- 查看记忆 / 删除记忆 <关键词> / 我的论文\n"
+    "- 我的待办 / 我发起的流程 / 发起流程（流程中心：审批流转）"
 )
 
 
@@ -1489,6 +1628,54 @@ def api_chat(params):
         wb.mem_remove(hit["id"], by=_who(params))
         return {"ok": True, "reply": "已删除记忆（%s）：%s" % (hit.get("ts", ""), hit.get("text", "")[:80]),
                 "module": "memory"}
+
+    # 0.35) 流程中心（BPM 审批流转）：待办 / 我发起的 / 抄送 / 发起
+    if any(k in text for k in ["我的待办", "待办任务", "待我审批", "我的审批", "待办审批"]):
+        items = bpm.todo(_who(params))
+        if not items:
+            return {"ok": True, "module": "bpm",
+                    "reply": "你当前没有待办审批任务。\n\n"
+                             "去「🔀 流程中心 → 发起流程」提交一个审批；内置模板："
+                             "论文送审审批、开题报告审批、实验资源申请、通用审批。"}
+        md = ["# 我的待办（%d 条）" % len(items), ""]
+        for t in items[:15]:
+            md.append("- **%s** — 流程「%s」 · 当前节点：%s · 发起人：%s" % (
+                t.get("inst_title") or "(无标题)", t.get("def_name"),
+                t.get("name"), t.get("initiator")))
+        md.append("\n> 在「🔀 流程中心 → 我的待办」可执行：通过 / 驳回 / 转办 / 委派 / 加签 / 抄送 / 催办。")
+        return {"ok": True, "reply": "\n".join(md), "module": "bpm"}
+    if any(k in text for k in ["我发起的流程", "我的流程", "流程进度", "流程跟踪", "流程实例"]):
+        items = bpm.mine(_who(params))
+        if not items:
+            return {"ok": True, "module": "bpm",
+                    "reply": "你还没有发起过流程。去「🔀 流程中心 → 发起流程」选一个模板试试。"}
+        md = ["# 我发起的流程（%d 条）" % len(items), ""]
+        for i in items[:15]:
+            prog = " → ".join("%s%s" % (p.get("name"), "✓" if p.get("state") == "done"
+                                      else ("●" if p.get("state") == "current" else "○"))
+                             for p in bpm.progress(i))
+            md.append("- **%s**（%s）\n  %s" % (
+                i.get("title"), bpm.STATUS_ZH.get(i.get("status"), i.get("status")), prog))
+        md.append("\n> 完整跟踪与撤销见「🔀 流程中心 → 我发起的」。")
+        return {"ok": True, "reply": "\n".join(md), "module": "bpm"}
+    if any(k in text for k in ["我的抄送", "抄送的流程", "抄送我的"]):
+        items = bpm.cc_list(_who(params))
+        md = ["# 我的抄送（%d 条）" % len(items), ""] if items else []
+        if not items:
+            return {"ok": True, "module": "bpm", "reply": "还没有抄送给你的流程。"}
+        for c in items[:15]:
+            md.append("- **%s**（%s）· 抄送人：%s · %s" % (
+                c.get("title"), c.get("status"), c.get("by"), c.get("ts")))
+        return {"ok": True, "reply": "\n".join(md), "module": "bpm"}
+    if any(k in text for k in ["发起流程", "发起审批", "提交审批", "流程中心", "工作流审批", "审批流程", "新建流程"]):
+        defs = bpm.def_list(_who(params))
+        md = ["# 流程中心\n", "可用的流程定义（%d 个）：" % len(defs), ""]
+        for d in defs:
+            nodes = " → ".join(n.get("name", "") for n in (d.get("nodes") or []))
+            md.append("- **%s**（%s）　%s" % (d.get("name"), d.get("category"), nodes))
+        md.append("\n> 到「🔀 流程中心」：**发起流程**（选模板 + 填表单）、**我的待办**（审批）、"
+                  "**流程设计**（自定义节点/审批人/会签/条件分支）、**流程监控**（管理员）。")
+        return {"ok": True, "reply": "\n".join(md), "module": "bpm"}
 
     # 0.4) 工作流：简历/技能 → 十步走到定方向；确认方向
     if any(k in text for k in ["个人简历", "简历", "启动工作流", "开始十步走", "十步走启动", "从简历开始"]) \
@@ -1742,6 +1929,7 @@ API_MAP = {
     "reffolder": api_reffolder,
     "reviewflow": api_reviewflow,
     "workflow": api_workflow,
+    "bpm": api_bpm,
     "dataset": api_dataset,
     "format": api_format,
     "model_list": api_model_list,
@@ -1846,6 +2034,12 @@ def main():
         auth.ensure_admin()
     except Exception as e:
         print("警告：创建初始管理员失败：%s" % e)
+
+    # 首次启动写入内置流程模板（论文送审/开题/资源申请/通用）
+    try:
+        bpm.ensure_templates()
+    except Exception as e:
+        print("警告：写入内置流程模板失败：%s" % e)
 
     # 防重复启动：Windows 下 SO_REUSEADDR 允许重复绑定，先探测端口是否已有服务
     import socket as _socket
