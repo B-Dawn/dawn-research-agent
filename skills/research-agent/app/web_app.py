@@ -43,6 +43,7 @@ import model_bridge as model  # noqa: E402
 import auth  # noqa: E402
 import workbench as wb  # noqa: E402
 import bpm  # noqa: E402  流程引擎（JeecgBoot/Flowable 风格 BPM）
+import pipeline  # noqa: E402  全流程编排（①定方向→②调研→③创新点/可行性→④苏格拉底定题→⑤人工审核）
 
 # 服务端内存：保存最近一次检索结果，供「对比矩阵」直接使用
 _LAST_SEARCH = {"query": "", "records": []}
@@ -52,7 +53,7 @@ ADMIN_ONLY_APIS = ("model_set",)
 
 STATIC_DIR = HERE
 INDEX_FILE = os.path.join(STATIC_DIR, "index.html")
-APP_VERSION = "0.9.0"  # 版本号唯一来源：改这里，页面（标题/登录页/侧栏）自动同步
+APP_VERSION = "1.0.0"  # 版本号唯一来源：改这里，页面（标题/登录页/侧栏）自动同步
 APPJS_FILE = os.path.join(STATIC_DIR, "app.js")
 
 
@@ -1198,6 +1199,40 @@ def api_bpm(params):
     return {"ok": False, "error": "未知操作 %s" % action}
 
 
+def api_pipeline(params):
+    """全流程一键编排：①定方向 →②文献调研 →③创新点/可行性 →④苏格拉底问询定题 →⑤提交人工审核。
+
+    交付规则：只有经过苏格拉底问询并逐条回应的题目才判为合格，合格后才提交人工审核；
+    「交给人工审核之前的内容」全部自动完成（不需要 AI 的环节在未配模型时也照常执行）。
+    """
+    action = params.get("action") or "run"
+    by = _who(params)
+    if action == "state":
+        return {"ok": True, "state": pipeline.state(by), "report_md": pipeline.report_md(pipeline.state(by))}
+    if action == "reset":
+        return pipeline.reset(by)
+    if action == "run":
+        opts = {
+            "resume_text": params.get("resume_text") or params.get("text") or "",
+            "query": params.get("query") or "",
+            "sources": params.get("sources") or "arxiv,openalex,crossref,s2",
+            "limit": params.get("limit") or 20,
+            "collect_n": params.get("collect_n") or 30,
+            "matrix_max": params.get("matrix_max") or 15,
+            "digest_n": params.get("digest_n") or 3,
+            "folder_name": params.get("folder_name") or "",
+            "auto_review": params.get("auto_review", True),
+            "only": params.get("only") or [],
+            "force": bool(params.get("force")),
+        }
+        r = pipeline.run(by, opts)
+        st = pipeline.state(by)
+        return {"ok": True, "module": "bpm", "report_md": r["report_md"], "state": st,
+                "topic": r.get("topic"), "review_inst": r.get("review_inst"),
+                "results": r.get("results"), "guide_steps": r.get("guide_steps")}
+    return {"ok": False, "error": "未知操作 %s" % action}
+
+
 def api_dataset(params):
     """实验数据集：从论文/开题提取数据集名 → Zenodo 检索 → 下载。"""
     action = params.get("action") or "search"
@@ -1538,7 +1573,9 @@ HELP_TEXT = (
     "- 确认方向：<最终方向>（定稿后进入文献调研）\n"
     "- 记住：实验一律先跑 3 个随机种子（写入长期记忆）\n"
     "- 查看记忆 / 删除记忆 <关键词> / 我的论文\n"
-    "- 我的待办 / 我发起的流程 / 发起流程（流程中心：审批流转）"
+    "- 我的待办 / 我发起的流程 / 发起流程（流程中心：审批流转）\n"
+    "- 一键全流程（自动跑：定方向→文献调研→创新点/可行性→苏格拉底问询定题→提交人工审核）\n"
+    "- 苏格拉底 / 定题目 / 全流程进度"
 )
 
 
@@ -1628,6 +1665,33 @@ def api_chat(params):
         wb.mem_remove(hit["id"], by=_who(params))
         return {"ok": True, "reply": "已删除记忆（%s）：%s" % (hit.get("ts", ""), hit.get("text", "")[:80]),
                 "module": "memory"}
+
+    # 0.34) 全流程一键编排（①定方向→②调研→③创新点/可行性→④苏格拉底定题→⑤人工审核）
+    if any(k in text for k in ["一键全流程", "全流程", "一键跑完", "自动化全流程", "全自动",
+                               "跑流程", "跑全流程", "一键完成", "继续全流程", "接着跑"]):
+        resume = ""
+        m0 = re.search(r"(?:简历|方向|我的方向)[：:]\s*(.+)$", text, re.S)
+        if m0 and len(m0.group(1).strip()) >= 20:
+            resume = m0.group(1).strip()
+        only = ["search", "collect", "matrix"] if "文献" in text and "题目" not in text else []
+        r = api_pipeline({"action": "run", "_user": params.get("_user"),
+                          "resume_text": resume, "only": only})
+        rep = r.get("report_md") or ""
+        return {"ok": True, "reply": rep, "module": "bpm" if r.get("review_inst") else "workflow"}
+    if any(k in text for k in ["苏格拉底", "苏格拉底式", "问询", "追问"]):
+        r = api_pipeline({"action": "run", "_user": params.get("_user"),
+                          "only": ["socratic", "topic", "review"]})
+        return {"ok": True, "reply": r.get("report_md") or "", "module": "bpm"}
+    if any(k in text for k in ["定题目", "确定题目", "生成题目", "拟定题目", "起个题目"]):
+        r = api_pipeline({"action": "run", "_user": params.get("_user"),
+                          "only": ["socratic", "topic", "review"]})
+        return {"ok": True, "reply": r.get("report_md") or "", "module": "bpm"}
+    if any(k in text for k in ["提交审核", "送审", "提交人工审核", "交给人工审核"]):
+        r = api_pipeline({"action": "run", "_user": params.get("_user"), "only": ["review"]})
+        return {"ok": True, "reply": r.get("report_md") or "", "module": "bpm"}
+    if any(k in text for k in ["全流程进度", "全流程状态", "流程跑到哪"]):
+        st = pipeline.state(_who(params))
+        return {"ok": True, "reply": pipeline.report_md(st), "module": "workflow"}
 
     # 0.35) 流程中心（BPM 审批流转）：待办 / 我发起的 / 抄送 / 发起
     if any(k in text for k in ["我的待办", "待办任务", "待我审批", "我的审批", "待办审批"]):
@@ -1930,6 +1994,7 @@ API_MAP = {
     "reviewflow": api_reviewflow,
     "workflow": api_workflow,
     "bpm": api_bpm,
+    "pipeline": api_pipeline,
     "dataset": api_dataset,
     "format": api_format,
     "model_list": api_model_list,

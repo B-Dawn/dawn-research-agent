@@ -233,7 +233,7 @@ function switchTab(tab) {
   if (tab === "format") { loadFtPapers(); loadFtTemplate(); }
   if (tab === "memory") { loadMems(); }
   if (tab === "mypaper") { loadMyPapers(); loadDpPapers(); }
-  if (tab === "guide") { bootGuide(); }
+  if (tab === "guide") { bootGuide(); plLoadState(); }
   if (tab === "bpm") { bpmBoot(); }
   if (tab === "chat") { refreshChatSelectors(); refreshChatModelBadge(); }
   if (tab === "reflib") { loadFolders(); }
@@ -338,6 +338,11 @@ function renderChatActions(module) {
     parts.push('<button class="chat-act-btn ghost" onclick="switchTab(\'journal\')">📮 选刊</button>');
     parts.push('<button class="chat-act-btn ghost" onclick="switchTab(\'recommend\')">🎯 方向推荐</button>');
     parts.push('<button class="chat-act-btn ghost" onclick="switchTab(\'memory\')">🧠 记住结论</button>');
+    parts.push('<button class="chat-act-btn ghost" onclick="switchTab(\'guide\')">⚡ 一键全流程</button>');
+  }
+  // 流程/全流程类回复：给一键续跑入口
+  if (module === "workflow" || module === "bpm") {
+    parts.push('<button class="chat-act-btn ghost" onclick="switchTab(\'guide\')">⚡ 一键全流程</button>');
   }
   return '<div class="chat-actions">' + parts.join("") + '</div>';
 }
@@ -346,7 +351,9 @@ function chatWelcome() {
   const md =
     "你好，我是**破晓**，你的论文全流程助手（🧭 论文十步走）。可以直接说：\n\n" +
     "**从零开始（工作流）：**\n" +
-    "- 粘贴你的**个人简历/擅长技术**，我按十步走帮你把方向定下来\n" +
+    "- **一键全流程**：自动跑完「交给人工审核之前」的全部内容 —— ①定方向 →②文献调研 →③创新点/可行性 →④苏格拉底问询定题 →⑤提交人工审核\n" +
+    "- 也可以：粘贴你的**个人简历/擅长技术**，我按十步走帮你把方向定下来\n" +
+    "- 苏格拉底问询 / 定题目 / 全流程进度 / 继续全流程\n" +
     "- 确认方向：<最终方向>（定稿后自动进入文献调研）\n\n" +
     "**文献与写作：**\n" +
     "- 检索 UAV 入侵检测 近三年论文 / 把刚才的结果生成对比矩阵\n" +
@@ -903,6 +910,56 @@ $("gd-reset").addEventListener("click", async () => {
   _gdDone = {};
   await post("guide", { action: "save", steps: {} });
   selectStep(GD_STEPS[0]);
+});
+
+// ---------------- ⚡ 一键全流程（①定方向→②调研→③创新点/可行性→④苏格拉底定题→⑤人工审核） ----------------
+const PL_STAGE_ICON = { ok: "✅", warn: "⚠️", blocked: "⛔", fail: "❌", skip: "⏭️", todo: "·" };
+function plRenderStages(stages) {
+  return '<table class="tbl"><tr><th>环节</th><th>状态</th><th>说明</th></tr>' +
+    (stages || []).map(s => "<tr><td>" + esc(s.name) + "</td><td>" +
+      (PL_STAGE_ICON[s.status] || "·") + " " + esc(s.status) + "</td><td>" +
+      esc(s.note || s.error || "—") + "</td></tr>").join("") + "</table>";
+}
+async function plLoadState() {
+  const r = await post("pipeline", { action: "state" });
+  if (!r || !r.ok) return;
+  $("pl-out").classList.remove("hidden");
+  $("pl-md").innerHTML = renderMarkdown(r.report_md || "") +
+    '<h4>环节明细</h4>' + plRenderStages((r.state || {}).stages);
+}
+async function plRun(opts, label) {
+  setStatus("pl-status", (label || "全流程") + " 执行中…（含联网检索与 AI 调用，可能需要 1–3 分钟）");
+  const r = await post("pipeline", Object.assign({ action: "run" }, opts || {}));
+  if (!r || !r.ok) { setStatus("pl-status", (r && r.error) || "执行失败", "err"); return; }
+  $("pl-out").classList.remove("hidden");
+  $("pl-md").innerHTML = renderMarkdown(r.report_md || "") +
+    '<h4>环节明细</h4>' + plRenderStages((r.state || {}).stages);
+  const st = (r.state || {}).stages || [];
+  const okN = st.filter(s => s.status === "ok").length;
+  const blk = st.filter(s => s.status === "blocked").length;
+  const t = r.topic || {};
+  let msg = "完成 " + okN + "/" + st.length + " 环节";
+  if (blk) msg += "；" + blk + " 个环节需配置模型后续跑";
+  if (t.topic) msg += "；题目：" + (t.qualified ? "已合格 ✅ " : "待完善 ⚠️ ") + t.topic;
+  if (r.review_inst) msg += "；已提交人工审核 " + r.review_inst;
+  setStatus("pl-status", msg, blk ? "warn" : "ok");
+  if (r.guide_steps) { _gdDone = r.guide_steps; renderGuide(); }
+}
+$("pl-run").addEventListener("click", () => plRun({
+  resume_text: $("pl-resume").value.trim(), query: $("pl-query").value.trim(),
+  sources: $("pl-sources").value.trim(), limit: +$("pl-limit").value || 20,
+  collect_n: +$("pl-collect").value || 30, digest_n: +$("pl-digest").value || 3,
+  force: true }, "一键全流程"));
+$("pl-resume-btn").addEventListener("click", () => plRun({}, "继续全流程"));
+$("pl-soc").addEventListener("click", () => plRun({ only: ["socratic", "topic", "review"], force: true },
+  "苏格拉底问询 + 定题"));
+$("pl-reset").addEventListener("click", async () => {
+  if (!confirm("确认重置全流程状态？（不删除已收录的文献与流程实例）")) return;
+  const r = await post("pipeline", { action: "reset" });
+  if (!r || !r.ok) { setStatus("pl-status", (r && r.error) || "重置失败", "err"); return; }
+  $("pl-out").classList.add("hidden");
+  $("pl-md").innerHTML = "";
+  setStatus("pl-status", "已重置，可重新一键全流程", "ok");
 });
 
 // ---------------- 论文精读 ----------------

@@ -135,6 +135,21 @@ def builtin_templates():
               {"from": "n2", "to": "n3", "cond": "amount > 10"},
               {"from": "n2", "to": "n4", "cond": ""},
               {"from": "n3", "to": "n4"}]),
+        _tpl("论文选题审核", "选题", "全流程自动产出「经苏格拉底问询合格的题目」后提交人工审核：导师审核 → 学院终审",
+             [{"key": "topic", "label": "论文题目", "type": "text", "required": True},
+              {"key": "direction", "label": "研究方向", "type": "text", "required": False},
+              {"key": "hypothesis", "label": "核心假设/命题", "type": "textarea", "required": False},
+              {"key": "innovations", "label": "创新点", "type": "textarea", "required": False},
+              {"key": "feasibility", "label": "可行性结论", "type": "textarea", "required": False},
+              {"key": "socratic", "label": "苏格拉底问询与回应（合格依据）", "type": "textarea", "required": False},
+              {"key": "evidence", "label": "文献依据", "type": "textarea", "required": False}],
+             [{"id": "n1", "type": "start", "name": "提交题目"},
+              {"id": "n2", "type": "approve", "name": "导师审核", "assignee_type": "role",
+               "assignee": "teacher", "sign_mode": "or", "allow_reject": True, "reject_to": "initiator"},
+              {"id": "n3", "type": "approve", "name": "学院终审", "assignee_type": "role",
+               "assignee": "admin", "sign_mode": "or", "allow_reject": True, "reject_to": "n2"},
+              {"id": "n4", "type": "end", "name": "结束"}],
+             [{"from": "n1", "to": "n2"}, {"from": "n2", "to": "n3"}, {"from": "n3", "to": "n4"}]),
         _tpl("通用审批", "通用", "最简流程：提交 → 单人审批 → 结束（可自行加节点）",
              [{"key": "title", "label": "标题", "type": "text", "required": True},
               {"key": "detail", "label": "内容", "type": "textarea", "required": False}],
@@ -147,17 +162,20 @@ def builtin_templates():
 
 
 def ensure_templates():
-    """首次使用时写入内置模板（不覆盖用户已有定义）。"""
+    """写入内置模板；已存在的同名模板不覆盖，新模板增量补齐（不覆盖用户自建）。"""
     def fn(obj):
-        if obj.get("defs"):
-            return None
+        existing = {d.get("name") for d in obj.get("defs", [])}
+        added = 0
         for t in builtin_templates():
+            if t["name"] in existing:
+                continue
             t = dict(t)
             t["id"] = "wfd%03d" % _next_id(obj, "def")
             t["owner"] = "system"
             t["ts"] = _now()
             obj.setdefault("defs", []).append(t)
-        return obj
+            added += 1
+        return obj if added else None
     try:
         _mutate(fn)
     except Exception:

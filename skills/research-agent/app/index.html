@@ -1227,7 +1227,29 @@
     <!-- 论文引导（小白流程） -->
     <section data-pane="guide" class="hidden">
       <div class="card">
-        <h3 style="margin-top:0">论文引导 · 十步走 <span style="font-weight:400;color:var(--muted);font-size:12px">（第一次写论文？按流程图一步步来；点任意节点查看引导，完成后打勾，进度自动保存）</span></h3>
+        <h3 style="margin-top:0">⚡ 一键全流程 <span style="font-weight:400;color:var(--muted);font-size:12px">（自动跑完「交给人工审核之前」的全部内容：①定方向 →②文献调研 →③创新点/可行性 →④苏格拉底问询定题 →⑤提交人工审核。<b>只有经过苏格拉底问询并逐条回应的题目才合格</b>，合格后才送审）</span></h3>
+        <div class="row">
+          <div style="flex:2"><label>简历 / 方向描述（可选；≥20 字时由 AI 自动定方向）</label>
+            <textarea id="pl-resume" style="min-height:70px" placeholder="粘贴个人简历、擅长技术、想做的方向；留空则沿用「科研画像」里已保存的方向"></textarea></div>
+          <div><label>检索式（可选）</label><input id="pl-query" placeholder="留空则用最终方向检索"></div>
+        </div>
+        <div class="row">
+          <div><label>文献源</label><input id="pl-sources" value="arxiv,openalex,crossref,s2"></div>
+          <div><label>每源上限</label><input id="pl-limit" type="number" value="20"></div>
+          <div><label>收录篇数</label><input id="pl-collect" type="number" value="30"></div>
+          <div><label>精读篇数</label><input id="pl-digest" type="number" value="3"></div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="run" id="pl-run">⚡ 一键全流程</button>
+          <button class="run ghost" id="pl-resume-btn" style="margin-top:0">继续全流程（断点续跑）</button>
+          <button class="run ghost" id="pl-soc" style="margin-top:0">苏格拉底问询 + 定题</button>
+          <button class="run ghost" id="pl-reset" style="margin-top:0">重置全流程</button>
+        </div>
+        <span class="status" id="pl-status"></span>
+        <div class="out hidden" id="pl-out"><div class="md" id="pl-md"></div></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">论文引导 · 十步走 <span style="font-weight:400;color:var(--muted);font-size:12px">（第一次写论文？按流程图一步步来；点任意节点查看引导，完成后打勾，进度自动保存。上方「一键全流程」会自动勾选 ①–④ 步）</span></h3>
         <div class="g-flow" id="gd-flow"></div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px">
           <span class="status" id="gd-progress"></span>
