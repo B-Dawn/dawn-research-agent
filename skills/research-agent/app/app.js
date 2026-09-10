@@ -314,6 +314,7 @@ const MODULE_INFO = {
   matrix:   { tab: "matrix",   label: "对比矩阵",     icon: "📋" },
   search:   { tab: "search",   label: "文献检索",     icon: "🔍" },
   ask:      { tab: null,       label: "AI 自由问答",  icon: "💬" },
+  agent:    { tab: null,       label: "智能体",       icon: "🧠", changed: true },
   help:     { tab: null,       label: "帮助",         icon: "❓" },
 };
 
@@ -344,6 +345,11 @@ function renderChatActions(module) {
   if (module === "workflow" || module === "bpm") {
     parts.push('<button class="chat-act-btn ghost" onclick="switchTab(\'guide\')">⚡ 一键全流程</button>');
   }
+  // 智能体回复：给工具清单入口，方便了解能力边界
+  if (module === "agent" || module === "ask") {
+    parts.push('<button class="chat-act-btn ghost" onclick="chatQuick(\'你会什么\')">🧰 我会什么</button>');
+    parts.push('<button class="chat-act-btn ghost" onclick="switchTab(\'guide\')">⚡ 一键全流程</button>');
+  }
   return '<div class="chat-actions">' + parts.join("") + '</div>';
 }
 
@@ -362,6 +368,11 @@ function chatWelcome() {
     "**实验与团队：**\n" +
     "- 登记实验 <名称> / 查一下实验台账 / 校验：<粘贴CSV>\n" +
     "- 看看任务进度 / 新建论文 <标题>\n\n" +
+    "**🧠 多步任务（我会自动串起来做）：**\n" +
+    "- `检索 UAV 入侵检测 最新论文，然后精读前三篇，再帮我选刊`\n" +
+    "- `检索 图神经网络 入侵检测，然后生成对比矩阵并收录到文献库`\n" +
+    "- 我会先**规划**，再逐步**调用工具**，你能看到每一步的「参数 / 观察结果」；复杂目标可加 `/智能模式` 强制执行\n" +
+    "- 说「你会什么」可以看我能调用的全部工具\n\n" +
     "**审批流程（🔀 流程中心）：**\n" +
     "- 我的待办 / 我发起的流程 / 发起流程\n" +
     "- 内置模板：论文送审审批、开题报告审批、实验资源申请、通用审批；支持通过/驳回/转办/委派/加签/抄送/会签/条件分支\n\n" +
@@ -404,6 +415,14 @@ chatBtn.addEventListener("click", sendChat);
 chatIn.addEventListener("keydown", (ev) => {
   if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); sendChat(); }
 });
+
+// 供对话快捷按钮调用：把文本填进输入框并直接发送
+function chatQuick(text) {
+  if (!text) return;
+  switchTab("chat");
+  chatIn.value = text;
+  sendChat();
+}
 
 // ---------------- 各模块动作 ----------------
 const ACT = {

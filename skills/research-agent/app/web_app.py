@@ -44,6 +44,7 @@ import auth  # noqa: E402
 import workbench as wb  # noqa: E402
 import bpm  # noqa: E402  流程引擎（JeecgBoot/Flowable 风格 BPM）
 import pipeline  # noqa: E402  全流程编排（①定方向→②调研→③创新点/可行性→④苏格拉底定题→⑤人工审核）
+import agent  # noqa: E402  智能体内核（规划→工具调用→观察→反思，ReAct/Plan-Execute/Reflection）
 
 # 服务端内存：保存最近一次检索结果，供「对比矩阵」直接使用
 _LAST_SEARCH = {"query": "", "records": []}
@@ -53,7 +54,7 @@ ADMIN_ONLY_APIS = ("model_set",)
 
 STATIC_DIR = HERE
 INDEX_FILE = os.path.join(STATIC_DIR, "index.html")
-APP_VERSION = "1.0.0"  # 版本号唯一来源：改这里，页面（标题/登录页/侧栏）自动同步
+APP_VERSION = "1.1.0"  # 版本号唯一来源：改这里，页面（标题/登录页/侧栏）自动同步
 APPJS_FILE = os.path.join(STATIC_DIR, "app.js")
 
 
@@ -1233,6 +1234,32 @@ def api_pipeline(params):
     return {"ok": False, "error": "未知操作 %s" % action}
 
 
+def api_agent(params):
+    """智能体内核：规划 → 工具调用 → 观察 → 反思。
+
+    多步目标会真正串起来执行（例：「检索X，然后精读前三篇，再帮我选刊」），
+    而不是只回一段文字。无模型时用规则规划器（零成本）仍可多步执行。
+    """
+    action = params.get("action") or "run"
+    by = _who(params)
+    if action == "run":
+        r = agent.run(by, params.get("goal") or params.get("text") or "",
+                      {"deep": params.get("deep", True)})
+        if not r.get("ok"):
+            return r
+        return {"ok": True, "module": r.get("module") or "ask",
+                "reply": agent.tradec_to_md(r.get("trace")) + r.get("answer_md", ""),
+                "plan": r.get("plan"), "trace": r.get("trace"),
+                "planner": r.get("planner"), "used_llm": r.get("used_llm")}
+    if action == "catalog":
+        return {"ok": True, "tools": agent.tool_catalog()}
+    if action == "last":
+        return {"ok": True, "turn": agent.last_trace(by)}
+    if action == "reset":
+        return agent.reset(by)
+    return {"ok": False, "error": "未知操作 %s" % action}
+
+
 def api_dataset(params):
     """实验数据集：从论文/开题提取数据集名 → Zenodo 检索 → 下载。"""
     action = params.get("action") or "search"
@@ -1575,7 +1602,11 @@ HELP_TEXT = (
     "- 查看记忆 / 删除记忆 <关键词> / 我的论文\n"
     "- 我的待办 / 我发起的流程 / 发起流程（流程中心：审批流转）\n"
     "- 一键全流程（自动跑：定方向→文献调研→创新点/可行性→苏格拉底问询定题→提交人工审核）\n"
-    "- 苏格拉底 / 定题目 / 全流程进度"
+    "- 苏格拉底 / 定题目 / 全流程进度\n"
+    "\n**多步任务（智能体自动串起来做）：**\n"
+    "- 检索 UAV 入侵检测 最新论文，然后精读前三篇，再帮我选刊\n"
+    "- 检索 图神经网络 入侵检测，然后生成对比矩阵并收录到文献库\n"
+    "- /智能模式 <任意复杂目标>（强制执行「规划→工具→观察→反思」全过程）"
 )
 
 
@@ -1590,6 +1621,44 @@ def _strip_query(text):
         q = q.replace(w, ' ')
     q = re.sub(r'\s+', ' ', q).strip(' ,，。.、:：')
     return q
+
+
+# 智能体接管的信号词：长任务/多步动作/平台操作
+_AGENT_VERBS = ["检索", "搜", "查一下", "查查", "找找", "分析", "精读", "选刊", "投稿",
+                "文献", "论文", "实验", "画像", "记忆", "待办", "审批", "流程", "题目",
+                "方向", "矩阵", "收录", "摘要", "整理", "总结", "生成", "帮我", "记一下",
+                "全流程", "苏格拉底", "选题"]
+
+
+def _agent_reply(by, text, force=False):
+    """试着让智能体接管（规划→工具→观察→反思）。
+
+    返回 None 表示「不接管」，交回原有意图路由，保证既有行为不回归。
+    """
+    try:
+        steps = agent.plan_rules(text)
+    except Exception:
+        steps = []
+    gate = force or len(steps) >= 2 or (len(text) >= 4 and any(k in text for k in _AGENT_VERBS))
+    if not gate:
+        return None
+    try:
+        r = agent.run(by, text)
+    except Exception as e:
+        return {"ok": True, "reply": "智能体执行异常：%s" % e, "module": "help"}
+    if not r.get("ok"):
+        return None
+    trace = r.get("trace") or []
+    real_tools = [t.get("tool") for t in trace
+                  if t.get("tool") not in ("-", "finish", "ask_model")]
+    terminal = next((t for t in trace if t.get("tool") == "finish"), None)
+    # 纯问答（只有 ask_model）时不接管，交回 api_ask 得到干净回答
+    if not force and not real_tools and not terminal:
+        return None
+    reply = agent.tradec_to_md(trace) + r.get("answer_md", "")
+    return {"ok": True, "reply": reply, "module": r.get("module") or "ask",
+            "agent": True, "planner": r.get("planner"), "steps": r.get("steps"),
+            "plan": r.get("plan"), "trace": trace}
 
 
 def _year_from(text, cur=None):
@@ -1626,6 +1695,21 @@ def api_chat(params):
     text = (params.get("text") or "").strip()
     if not text:
         return {"ok": True, "reply": HELP_TEXT, "module": "help"}
+
+    # 0) 智能体优先：显式指令（/xxx、智能模式）或检测到**多步目标**时交给智能体接管
+    #    单步请求不接管，继续走下面的意图路由，保证既有行为零回归。
+    if text.startswith("/") or "智能模式" in text:
+        _ar = _agent_reply(_who(params),
+                           text.lstrip("/").replace("智能模式", "").strip() or text, force=True)
+        if _ar:
+            return _ar
+    try:
+        if len(agent.plan_rules(text)) >= 2:
+            _ar = _agent_reply(_who(params), text)
+            if _ar:
+                return _ar
+    except Exception:
+        pass
 
     # 0) 长期记忆：记住：… / 查看记忆 / 删除记忆 <关键词>
     m = re.match(r"^(?:帮我)?(?:记住|记一下)[：:，,]?\s*(.+)$", text, re.S)
@@ -1665,6 +1749,21 @@ def api_chat(params):
         wb.mem_remove(hit["id"], by=_who(params))
         return {"ok": True, "reply": "已删除记忆（%s）：%s" % (hit.get("ts", ""), hit.get("text", "")[:80]),
                 "module": "memory"}
+
+    # 0.33) 智能体能力自述：工具清单（让人知道智能体能干什么）
+    if any(k in text for k in ["你会什么", "你能做什么", "有什么工具", "工具列表", "能力清单",
+                               "智能体能干什么", "你有哪些能力"]):
+        cats = agent.tool_catalog()
+        md = ["# 我可以调用的工具（%d 个）" % len(cats), "",
+              "你说一句带目标的话，我会**规划 → 调用这些工具 → 看结果 → 必要时补一步**，"
+              "把多步任务真正串起来做完。", ""]
+        for t in cats:
+            if t["name"] == "finish":
+                continue
+            ps = "、".join(t["params"].keys()) or "无参数"
+            md.append("- **%s** — %s（参数：%s）" % (t["name"], t["desc"], ps))
+        md += ["", "**例**：`检索 UAV 入侵检测 最新论文，然后精读前三篇，再帮我选刊`"]
+        return {"ok": True, "reply": "\n".join(md), "module": "agent"}
 
     # 0.34) 全流程一键编排（①定方向→②调研→③创新点/可行性→④苏格拉底定题→⑤人工审核）
     if any(k in text for k in ["一键全流程", "全流程", "一键跑完", "自动化全流程", "全自动",
@@ -1946,7 +2045,10 @@ def api_chat(params):
             return {"ok": True, "reply": reply, "module": "search"}
         return {"ok": True, "reply": "检索失败：" + sr.get("error", ""), "module": "search"}
 
-    # 7) 其余非命令消息：模型可用则自由问答（真 AI 判断，带上该用户长期记忆），否则给引导
+    # 7) 其余非命令消息：先让智能体尝试接管（多步/工具型目标），再退回自由问答
+    _ar = _agent_reply(_who(params), text)
+    if _ar:
+        return _ar
     if model.status()["ok"]:
         ar = api_ask({"text": text, "_user": params.get("_user"),
                       "model_preset": params.get("model_preset")})
@@ -1995,6 +2097,7 @@ API_MAP = {
     "workflow": api_workflow,
     "bpm": api_bpm,
     "pipeline": api_pipeline,
+    "agent": api_agent,
     "dataset": api_dataset,
     "format": api_format,
     "model_list": api_model_list,
