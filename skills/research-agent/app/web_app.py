@@ -2185,6 +2185,10 @@ class Handler(BaseHTTPRequestHandler):
                 return
         try:
             result = fn(params)
+        except PermissionError as e:
+            result = {"ok": False, "error": (
+                "数据文件写入被拒绝（%s）。通常是服务进程运行环境受限、数据文件被其他程序占用，"
+                "或存在多个服务实例：请关闭所有旧进程后重新启动服务。" % os.path.basename(str(e).strip("'"))[:80])}
         except Exception as e:  # 兜底，绝不让服务挂掉
             result = {"ok": False, "error": "服务器内部错误：%s" % e}
         _json_response(self, result)
@@ -2208,6 +2212,17 @@ def main():
         bpm.ensure_templates()
     except Exception as e:
         print("警告：写入内置流程模板失败：%s" % e)
+
+    # 数据目录写权限自检：环境受限时提前给出明确诊断，而不是运行中报 Errno 13
+    try:
+        import workbench as _wb
+        _probe = os.path.join(_wb._DATA_DIR, ".write_probe")
+        with open(_probe, "w", encoding="utf-8") as f:
+            f.write("ok")
+        os.remove(_probe)
+    except Exception as e:
+        print("！！警告：数据目录不可写（%s）——所有需要保存的操作都会失败。" % e)
+        print("！！请用常规方式在应用目录下启动本服务（不要在受限沙箱/只读环境里启动）。")
 
     # 防重复启动：Windows 下 SO_REUSEADDR 允许重复绑定，先探测端口是否已有服务
     import socket as _socket
