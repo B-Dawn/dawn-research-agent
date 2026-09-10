@@ -994,7 +994,7 @@ def rf_add_papers(rid, by, papers):
                 continue
             f.setdefault("papers", []).append({
                 "title": t, "year": p.get("year") or "", "venue": p.get("venue") or "",
-                "abstract": (p.get("abstract") or "")[:800], "link": p.get("link") or "",
+                "abstract": (p.get("abstract") or "")[:1500], "link": p.get("link") or "",
                 "source": p.get("source") or "", "ts": _now()})
             have.add(t.lower())
             added += 1
@@ -1021,6 +1021,107 @@ def rf_remove_paper(rid, by, idx):
     except ValueError as e:
         return {"ok": False, "error": str(e)}
     return {"ok": True, "folders": rf_list(by)}
+
+
+def rf_patch_paper(rid, by, title, **updates):
+    """按标题补全/更新单篇文献字段（如 abstract）。"""
+    def fn(obj):
+        f = _rf_get(obj, rid, by)
+        for p in f.get("papers", []):
+            if (p.get("title") or "").strip().lower() == (title or "").strip().lower():
+                for k, v in updates.items():
+                    if v is not None:
+                        p[k] = str(v)[:1500] if k == "abstract" else v
+                break
+        return obj
+    try:
+        _mutate("reffolders", fn)
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}
+    return {"ok": True}
+
+
+def _title_similar(a, b):
+    """粗略判断两个标题是否指向同一篇（英文按词、中文按字符的 Jaccard）。"""
+    def toks(s):
+        s = re.sub(r"[^\w\u4e00-\u9fff]+", " ", (s or "").lower()).strip()
+        if re.search(r"[\u4e00-\u9fff]", s):
+            return set(c for c in s if c.strip())
+        return set(w for w in s.split() if len(w) > 2)
+    ta, tb = toks(a), toks(b)
+    if not ta or not tb:
+        return False
+    inter = len(ta & tb)
+    return inter / max(1, min(len(ta), len(tb))) >= 0.6
+
+
+def _openalex_abstract(title):
+    """OpenAlex（免费、覆盖广、含摘要倒排索引）。"""
+    q = urllib.parse.quote(title)
+    j = model._http_get_json(
+        "https://api.openalex.org/works?search=%s&per-page=3&mailto=dawn-agent@example.com" % q,
+        timeout=20)
+    for w in (j.get("results") or []):
+        if not _title_similar(title, w.get("title") or ""):
+            continue
+        ii = w.get("abstract_inverted_index")
+        if not ii:
+            continue
+        pos = {}
+        for word, idxs in ii.items():
+            for i in idxs:
+                pos[i] = word
+        txt = " ".join(pos[k] for k in sorted(pos)).strip()
+        if txt:
+            return txt
+    return ""
+
+
+def rf_fetch_abstract(title):
+    """按标题自动抓取摘要（免费、无需 Key）。多源依次尝试。
+
+    放在后端执行：①避免浏览器 CORS 限制；②复用模型层的直连/代理回退逻辑。
+    数据源顺序：OpenAlex → Semantic Scholar → Crossref。
+    """
+    t = (title or "").strip()
+    if len(t) < 5:
+        return {"ok": False, "error": "标题过短，无法检索摘要"}
+    # 1) OpenAlex（最稳定，摘要覆盖率高）
+    try:
+        abst = _openalex_abstract(t)
+        if abst:
+            return {"ok": True, "abstract": abst[:1500], "source": "openalex"}
+    except Exception:
+        pass
+    # 2) Semantic Scholar（英文文献好，但免费额度易限流）
+    try:
+        j = model._http_get_json(
+            "https://api.semanticscholar.org/graph/v1/paper/search"
+            "?query=%s&fields=title,abstract&limit=3" % urllib.parse.quote(t), timeout=20)
+        for d in (j.get("data") or []):
+            if not _title_similar(t, d.get("title") or ""):
+                continue
+            abst = (d.get("abstract") or "").strip()
+            if abst:
+                return {"ok": True, "abstract": abst[:1500], "source": "semantic_scholar"}
+    except Exception:
+        pass
+    # 3) Crossref 兜底（提取 JATS 标签后正文）
+    try:
+        j = model._http_get_json(
+            "https://api.crossref.org/works?query=%s&rows=3&select=title,abstract" % urllib.parse.quote(t),
+            timeout=20)
+        for item in ((j.get("message") or {}).get("items") or []):
+            ti = " ".join(item.get("title") or []) if isinstance(item.get("title"), list) else (item.get("title") or "")
+            if not _title_similar(t, ti):
+                continue
+            abst = re.sub(r"<[^>]+>", " ", item.get("abstract") or "").strip()
+            abst = re.sub(r"\s+", " ", abst)
+            if abst:
+                return {"ok": True, "abstract": abst[:1500], "source": "crossref"}
+    except Exception:
+        pass
+    return {"ok": False, "error": "外部数据源未找到该文献摘要（可手动粘贴）"}
 
 
 def rf_set_analysis(rid, by, title, analysis):

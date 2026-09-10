@@ -1182,6 +1182,18 @@ $("rf-del").addEventListener("click", async () => {
   await post("reffolder", { action: "remove", id: f.id });
   _rfCur = null; loadFolders();
 });
+// ---- 自动补齐文献摘要（走后端，避免浏览器 CORS 限制） ----
+const _absCache = {};  // title → abstract (内存缓存，本次会话有效)
+async function fetchAbstract(title) {
+  if (_absCache[title] !== undefined) return _absCache[title];
+  try {
+    const r = await post("reffolder", { action: "fetch_abstract", title });
+    const abs = (r && r.ok && r.abstract) ? r.abstract : "";
+    _absCache[title] = abs;
+    return abs;
+  } catch (e) { return ""; }
+}
+
 function renderAnaTable() {
   const f = curFolder();
   if (!f) return;
@@ -1209,13 +1221,25 @@ $("rf-digest").addEventListener("click", async () => {
   if (!ps.length) { setStatus("rf-status", "文件夹为空", "err"); return; }
   const DIM_ZH = { tech: "技术点分析", innovation: "创新点总结", gap: "空白研究分析" };
   const total = ps.length * dims.length;
-  let done = 0;
+  let done = 0, autoFilled = 0, stillMissing = 0;
   for (let i = 0; i < ps.length; i++) {
     const p = ps[i];
-    const text = (p.title + ". " + (p.venue || "") + " " + (p.year || "") + ". " + (p.abstract || "")).trim();
+    let text = (p.title + ". " + (p.venue || "") + " " + (p.year || "") + ". " + (p.abstract || "")).trim();
+    // 摘要不足时自动从外部数据源补齐
+    if (text.length < 100 && p.title) {
+      setStatus("rf-status", "第 " + (i + 1) + "/" + ps.length + " 篇 · 自动补齐摘要…");
+      const fetched = await fetchAbstract(p.title);
+      if (fetched) {
+        text = (p.title + ". " + (p.venue || "") + " " + (p.year || "") + ". " + fetched).trim();
+        // 回写摘要到文献记录（持久化）
+        await post("reffolder", { action: "patch_paper", id: f.id, title: p.title, abstract: fetched });
+        autoFilled++;
+      }
+    }
     if (text.length < 100) {
+      stillMissing++;
       await post("reffolder", { action: "set_analysis", id: f.id, title: p.title,
-        analysis: "（元数据不足：缺少摘要，无法可靠精读。请先人工补全该文献的摘要后再生成。）" });
+        analysis: "（元数据不足：自动补齐摘要失败，且原文信息不足 100 字，无法可靠精读。请手动粘贴该文献的摘要后再试。）" });
       done += dims.length;
       continue;
     }
@@ -1223,12 +1247,45 @@ $("rf-digest").addEventListener("click", async () => {
     for (const d of dims) {
       setStatus("rf-status", "精读第 " + (i + 1) + "/" + ps.length + " 篇 · " + DIM_ZH[d.id] + "（总进度 " + (++done) + "/" + total + "）…");
       const r = await post("digest", { kind: d.id, text });
+      if (!r.ok) {
+        const em = String(r.error || "");
+        // 钥匙/模型类致命错误：立即中止整批，避免刷出几十行“生成失败”
+        if (/401|403|API Key|未授权|无权限|模型不可用|404/.test(em)) {
+          setStatus("rf-status", "已中止：模型调用失败——" + em + "（去「模型与API」检查 API Key / 模型名）", "err");
+          loadFolders().then(renderAnaTable);
+          return;
+        }
+      }
       combined += "\n\n## " + DIM_ZH[d.id] + "\n\n" + (r.ok ? r.reply : ("生成失败：" + (r.error || "")));
     }
     await post("reffolder", { action: "set_analysis", id: f.id, title: p.title, analysis: combined.trim() });
   }
-  setStatus("rf-status", "批量精读完成：" + ps.length + " 篇 × " + dims.length + " 个维度", "ok");
+  let msg = "批量精读完成：" + ps.length + " 篇 × " + dims.length + " 个维度";
+  if (autoFilled) msg += "；自动补齐摘要 " + autoFilled + " 篇";
+  if (stillMissing) msg += "；仍有 " + stillMissing + " 篇无摘要（可手动粘贴）";
+  setStatus("rf-status", msg, "ok");
   loadFolders().then(renderAnaTable);
+});
+// ---- 手动补齐缺失摘要 ----
+$("rf-fillabs").addEventListener("click", async () => {
+  const f = curFolder();
+  if (!f) { setStatus("rf-status", "先选择文件夹", "err"); return; }
+  const ps = f.papers || [];
+  if (!ps.length) { setStatus("rf-status", "文件夹为空", "err"); return; }
+  const missing = ps.filter(p => ((p.abstract || "").trim().length < 80));
+  if (!missing.length) { setStatus("rf-status", "所有文献都已有摘要（≥80 字）", "ok"); return; }
+  let okN = 0, failN = 0;
+  for (let i = 0; i < missing.length; i++) {
+    const p = missing[i];
+    setStatus("rf-status", "补齐摘要 " + (i + 1) + "/" + missing.length + "：" + (p.title || "").slice(0, 30) + "…");
+    const r = await post("reffolder", { action: "fetch_abstract", title: p.title });
+    if (r && r.ok && r.abstract) {
+      const w = await post("reffolder", { action: "patch_paper", id: f.id, title: p.title, abstract: r.abstract });
+      if (w && w.ok) { okN++; _absCache[p.title] = r.abstract; } else { failN++; }
+    } else { failN++; }
+  }
+  await loadFolders(); renderFolder();
+  setStatus("rf-status", "摘要补齐完成：成功 " + okN + " 篇" + (failN ? "，未找到 " + failN + " 篇（可手动粘贴）" : ""), okN ? "ok" : "warn");
 });
 let _rfSynLast = "";
 $("rf-syn").addEventListener("click", async () => {

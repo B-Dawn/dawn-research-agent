@@ -261,6 +261,26 @@ def _http_json(url, payload, headers=None, timeout=_TIMEOUT):
     raise last_err
 
 
+def _http_get_json(url, headers=None, timeout=20):
+    """GET 一个 JSON 接口（同样默认直连、失败且有代理时再走代理）。"""
+    req = urllib.request.Request(url, method="GET")
+    req.add_header("User-Agent", "DawnResearchAgent/1.0 (+https://github.com/B-Dawn)")
+    for k, v in (headers or {}).items():
+        req.add_header(k, v)
+    last_err = None
+    for use_proxy in (False, True):
+        try:
+            with _make_opener(use_proxy).open(req, timeout=timeout) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError:
+            raise
+        except (urllib.error.URLError, OSError) as e:
+            last_err = e
+            if use_proxy or not urllib.request.getproxies():
+                break
+    raise last_err
+
+
 def _friendly_http_error(code, raw):
     """把网关返回的错误体翻译成用户能看懂的中文提示。"""
     msg_zh, msg_en, rtype = "", "", ""
@@ -342,8 +362,23 @@ def chat(messages, cfg=None, max_tokens=1200, temperature=0.4):
             if e.code in (429, 503) and attempt < 2:
                 last = e
                 continue
-            raise
+            # 非重试类错误（401/403/404/4xx/5xx）→ 直接翻译成中文提示
+            detail = ""
+            try:
+                detail = e.read().decode("utf-8", "ignore")[:600]
+            except Exception:
+                pass
+            raise RuntimeError(_friendly_http_error(e.code, detail or str(e.reason)))
+        except (urllib.error.URLError, OSError) as e:
+            raise RuntimeError("无法连接模型服务：%s（请检查 Base URL 与网络）" % e)
     if out is None:
+        if isinstance(last, urllib.error.HTTPError):
+            detail = ""
+            try:
+                detail = last.read().decode("utf-8", "ignore")[:600]
+            except Exception:
+                pass
+            raise RuntimeError(_friendly_http_error(last.code, detail or str(last.reason)))
         raise last
     try:
         ch = out.get("choices")
