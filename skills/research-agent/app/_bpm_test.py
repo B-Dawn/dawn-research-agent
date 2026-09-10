@@ -1,10 +1,26 @@
 # -*- coding: utf-8 -*-
-"""流程引擎全生命周期测试。"""
+"""流程引擎全生命周期测试（回归测试）。
+
+⚠️ 安全护栏：本测试会**重置 data/bpm.json**（清空全部流程定义与实例）。
+   若检测到存在「非内置的流程定义」或「已有流程实例」，则直接退出不执行，
+   以免误删真实数据。确认要清空时请加参数 `--force`。
+"""
 import json
 import os
+import sys
 import bpm
 
-# 每次运行前重置流程数据，保证测试可重复（沙箱禁止删文件，改用清空写回）
+_warn = "--force" not in sys.argv
+_snap = bpm._load()
+_custom_defs = [d for d in _snap.get("defs", []) if not d.get("builtin")]
+_insts = _snap.get("instances", [])
+if _warn and (_custom_defs or _insts):
+    print("⚠️  检测到现有流程数据，已中止测试以避免误删：")
+    print("   自建流程定义 %d 个；流程实例 %d 个" % (len(_custom_defs), len(_insts)))
+    print("   如确需清空并运行测试，请执行：python _bpm_test.py --force")
+    sys.exit(0)
+
+# 重置流程数据，保证测试可重复（沙箱禁止删文件，改用清空写回）
 bpm._save(json.loads(json.dumps(bpm._EMPTY)))
 
 OK = FAIL = 0
