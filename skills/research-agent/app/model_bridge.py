@@ -377,9 +377,12 @@ def test(cfg=None):
         return {"ok": False, "error": msg}
 
 
-def quick_ask(question, system=None, cfg=None, max_tokens=900):
-    msgs = []
-    if system:
-        msgs.append({"role": "system", "content": system})
-    msgs.append({"role": "user", "content": question})
-    return chat(msgs, cfg=cfg, max_tokens=max_tokens)
+def quick_ask(question, system=None, cfg=None, max_tokens=900, temperature=None):
+  msgs = []
+  if system:
+    msgs.append({"role": "system", "content": system})
+  msgs.append({"role": "user", "content": question})
+  kwargs = {"cfg": cfg, "max_tokens": max_tokens}
+  if temperature is not None:
+    kwargs["temperature"] = temperature
+  return chat(msgs, **kwargs)

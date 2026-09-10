@@ -397,8 +397,15 @@ const ACT = {
   search: async () => {
     if ($("s-use-strategy") && $("s-use-strategy").checked) {
       setStatus("s-status", "调用「调研策略」技能定边界…");
-      const sr = await post("skills", { action: "run", skill: "lit_strategy", input: $("s-query").value });
-      if (sr.ok) { $("s-strat-out").classList.remove("hidden"); $("s-strat-md").innerHTML = renderMarkdown(sr.reply); }
+      let q = $("s-query").value.trim();
+      if (!q || q.length < 10) {
+        const wr = await post("workflow", { action: "get" });
+        if (wr.direction_final) q = wr.direction_final;
+      }
+      if (q && q.length >= 10) {
+        const sr = await post("skills", { action: "run", skill: "lit_strategy", input: q });
+        if (sr.ok) { $("s-strat-out").classList.remove("hidden"); $("s-strat-md").innerHTML = renderMarkdown(sr.reply); }
+      }
     }
     setStatus("s-status", "检索中…");
     const r = await post("search", {
@@ -410,6 +417,7 @@ const ACT = {
     $("s-out").classList.remove("hidden");
     setStatus("s-status", "命中 " + r.count + " 条" + (r.note ? "（" + r.note + "）" : ""), r.count ? "ok" : "warn");
     window._lastRecords = r.records || [];
+    _collectPage = 0;
     renderCollect();
   },
   matrix: async () => {
@@ -1039,6 +1047,8 @@ $("wf-socratic").addEventListener("click", async () => {
 });
 
 // ---- 检索 → 收录到文献库 ----
+let _collectPage = 0;
+const _PAGE_SIZE = 50;
 async function renderCollect() {
   const recs = window._lastRecords || [];
   if (!recs.length) { $("s-collect").classList.add("hidden"); return; }
@@ -1047,9 +1057,34 @@ async function renderCollect() {
   const fs = r.ok ? (r.folders || []) : [];
   $("rf-sel-quick").innerHTML = '<option value="">— 选择文件夹 —</option>' +
     fs.map(f => '<option value="' + f.id + '">' + esc(f.name) + "（" + (f.papers || []).length + " 篇）</option>").join("");
-  $("rf-collect-list").innerHTML = recs.slice(0, 30).map((p, i) =>
-    '<label style="display:block;font-size:12.5px;margin:3px 0"><input type="checkbox" class="rc-ck" data-i="' + i + '" checked> ' +
+  const total = recs.length;
+  const maxPage = Math.max(0, Math.ceil(total / _PAGE_SIZE) - 1);
+  if (_collectPage > maxPage) _collectPage = maxPage;
+  const start = _collectPage * _PAGE_SIZE;
+  const page = recs.slice(start, start + _PAGE_SIZE);
+  const chkAll = page.every((_, i) => {
+    const el = document.querySelector(".rc-ck[data-i='" + (start + i) + "']");
+    return el && el.checked;
+  });
+  let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:12px;color:var(--muted)">';
+  html += '<span>' + (total <= _PAGE_SIZE
+    ? '共 <b>' + total + '</b> 篇结果'
+    : '第 <b>' + (start + 1) + '–' + Math.min(start + _PAGE_SIZE, total) + '</b> / 共 <b>' + total + '</b> 篇');
+  if (total > _PAGE_SIZE) {
+    html += ' &nbsp; <button class="run ghost" style="font-size:11px;padding:2px 8px"' + (_collectPage <= 0 ? ' disabled' : '') + ' onclick="_collectPage--;renderCollect()">◀ 上一页</button>';
+    html += ' <button class="run ghost" style="font-size:11px;padding:2px 8px"' + (_collectPage >= maxPage ? ' disabled' : '') + ' onclick="_collectPage++;renderCollect()">下一页 ▶</button>';
+  }
+  html += '</span>';
+  html += '<label style="cursor:pointer"><input type="checkbox" id="rf-collect-all" ' + (chkAll ? 'checked' : '') + '> 全选本页</label></div>';
+  html += page.map((p, i) =>
+    '<label style="display:block;font-size:12.5px;margin:3px 0"><input type="checkbox" class="rc-ck" data-i="' + (start + i) + '" checked> ' +
     esc((p.title || "").slice(0, 90)) + ' <span class="chat-hint">[' + esc(p.year || "—") + "·" + esc(p.source || "") + ']</span></label>').join("");
+  $("rf-collect-list").innerHTML = html;
+  // 全选/取消全选
+  const allCk = document.getElementById("rf-collect-all");
+  if (allCk) allCk.addEventListener("change", () => {
+    document.querySelectorAll(".rc-ck").forEach(c => c.checked = allCk.checked);
+  });
 }
 $("rf-collect").addEventListener("click", async () => {
   const recs = window._lastRecords || [];
@@ -1074,7 +1109,14 @@ $("s-use-direction").addEventListener("click", async () => {
 });
 $("s-strategy").addEventListener("click", async () => {
   setStatus("s-status", "生成调研策略…");
-  const r = await post("skills", { action: "run", skill: "lit_strategy", input: $("s-query").value });
+  let q = $("s-query").value.trim();
+  // 搜索框为空或过短时，自动使用科研画像的最终方向作为输入
+  if (!q || q.length < 10) {
+    const wr = await post("workflow", { action: "get" });
+    if (wr.direction_final) { q = wr.direction_final; setStatus("s-status", "生成调研策略（使用画像方向）…"); }
+    else { setStatus("s-status", "请先在检索框输入≥10字的检索式，或先去「科研画像」确认方向", "err"); return; }
+  }
+  const r = await post("skills", { action: "run", skill: "lit_strategy", input: q });
   if (r.ok) { $("s-strat-out").classList.remove("hidden"); $("s-strat-md").innerHTML = renderMarkdown(r.reply); setStatus("s-status", "策略已生成", "ok"); }
   else setStatus("s-status", r.error || "失败", "err");
 });
