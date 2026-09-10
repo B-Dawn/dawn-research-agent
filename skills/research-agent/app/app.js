@@ -293,6 +293,51 @@ function addAgent(md) {
   return addBubble("agent", '<div class="md">' + renderMarkdown(md) + "</div>");
 }
 
+// ---------------- 对话联动：module → 平台功能映射 ----------------
+const MODULE_INFO = {
+  memory:   { tab: "memory",   label: "长期记忆",     icon: "🧠", changed: true },
+  workflow: { tab: "guide",    label: "论文十步走",   icon: "🧭", changed: true },
+  mypaper:  { tab: "mypaper",  label: "我的论文",     icon: "📄" },
+  journal:  { tab: "journal",  label: "选刊",         icon: "📮" },
+  plot:     { tab: "plot",     label: "出图",         icon: "📊" },
+  ai:       { tab: "profile",  label: "AI 诊断/推荐", icon: "🤖" },
+  recommend:{ tab: "recommend",label: "方向推荐",     icon: "🎯" },
+  profile:  { tab: "profile",  label: "科研画像",     icon: "👤" },
+  task:     { tab: "team",     label: "协作中心",     icon: "✅", changed: true },
+  paper:    { tab: "collab",   label: "合作对接",     icon: "🤝" },
+  experiment:{tab: "lab",      label: "实验台账",     icon: "🔬", changed: true },
+  validate: { tab: "lab",      label: "实验台账",     icon: "🔬" },
+  matrix:   { tab: "matrix",   label: "对比矩阵",     icon: "📋" },
+  search:   { tab: "search",   label: "文献检索",     icon: "🔍" },
+  ask:      { tab: null,       label: "AI 自由问答",  icon: "💬" },
+  help:     { tab: null,       label: "帮助",         icon: "❓" },
+};
+
+/** 在对话气泡下方渲染操作栏（跳转标签页 / 数据变更提示 / AI 建议操作） */
+function renderChatActions(module) {
+  const info = MODULE_INFO[module];
+  if (!info) return "";
+  const parts = [];
+  // 功能标签
+  parts.push('<span class="chat-mod-tag">' + (info.icon || "📎") + ' ' + esc(info.label) + '</span>');
+  // 跳转按钮
+  if (info.tab) {
+    parts.push('<button class="chat-act-btn" onclick="switchTab(\'' + info.tab + '\')">前往「' + esc(info.label) + '」</button>');
+  }
+  // 数据变更提示
+  if (info.changed) {
+    parts.push('<span class="chat-changed-hint">✏️ 数据已更新</span>');
+  }
+  // AI 自由问答：追加平台功能快捷入口
+  if (module === "ask") {
+    parts.push('<button class="chat-act-btn ghost" onclick="switchTab(\'search\')">🔍 检索文献</button>');
+    parts.push('<button class="chat-act-btn ghost" onclick="switchTab(\'journal\')">📮 选刊</button>');
+    parts.push('<button class="chat-act-btn ghost" onclick="switchTab(\'recommend\')">🎯 方向推荐</button>');
+    parts.push('<button class="chat-act-btn ghost" onclick="switchTab(\'memory\')">🧠 记住结论</button>');
+  }
+  return '<div class="chat-actions">' + parts.join("") + '</div>';
+}
+
 function chatWelcome() {
   const md =
     "你好，我是**破晓**，你的论文全流程助手（🧭 论文十步走）。可以直接说：\n\n" +
@@ -327,7 +372,7 @@ async function sendChat() {
         addAgent(r.reply || "图已生成");
         addBubble("agent", r.svg);
       } else {
-        addAgent(r.reply || "…");
+        addAgent((r.reply || "…") + renderChatActions(r.module));
       }
     } else {
       addAgent("出错了：" + r.error);
