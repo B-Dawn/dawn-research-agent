@@ -698,21 +698,32 @@ def _run_revise(by, opts, cache):
                 % (meta.get("round", 1), meta["avg"], REVIEW_PASS_SCORE)}
     comments = "\n\n".join("【%s，评分 %s】\n%s" % (r["reviewer"], r["score"], r["text"][:2600])
                            for r in reviews)
-    # —— 分节修订：每节按意见改写（避免整篇重生成被 token 截断）——
+    # —— 定向分节修订：只改审稿意见真正涉及的章节（全量逐节修订过慢且常超时）——
     secs = _split_sections(md)
     revised, notes = [], []
     ok_n = 0
-    for s in secs:
+    # 从意见中定位重点章节：含批评关键词的节 + 始终复查摘要/引言/结论
+    hot_words = ("问题", "必须修改", "缺失", "不足", "建议", "错误", "不清楚", "缺陷", "质疑")
+    hot_idx = set()
+    for i, s in enumerate(secs):
+        t = s["title"] + s["body"][:400]
+        if any(w in comments for w in (s["title"].strip(" #").split()[0] if s["title"].strip(" #").split() else "")):
+            hot_idx.add(i)
+        if re.search(r"摘要|Abstract", s["title"]) or re.search(r"引言", s["title"]) \
+                or re.search(r"结论", s["title"]) or re.search(r"实验", s["title"]) \
+                or re.search(r"方法", s["title"]):
+            hot_idx.add(i)
+    for i, s in enumerate(secs):
         body = (s["title"] + "\n\n" + s["body"]).strip()
-        if len(body) < 60 or s["title"].startswith("# "):   # 大标题行/过短节原样保留
+        if len(body) < 120 or i not in hot_idx:   # 非重点节原样保留
             revised.append(body)
             continue
         try:
-            out = _ai("这是论文的一个章节：\n\n%s\n\n\n三位审稿人意见（与本节相关的请落实）：\n%s\n\n"
+            out = _ai("这是论文的一个章节：\n\n%s\n\n\n三位审稿人意见（仅落实与本节相关的）：\n%s\n\n"
                       "请仅输出**该章节修改后的完整 Markdown**（保持原有标题层级；"
                       "实验数字只能沿用原文真实数字；不得删减小节；文献占位符保留）。"
-                      % (body[:6500], comments[:4500]),
-                      system="你是论文修改专家。只输出章节正文，不要解释。", max_tokens=2800)
+                      % (body[:6500], comments[:4000]),
+                      system="你是论文修改专家。只输出章节正文，不要解释。", max_tokens=2200, temperature=0.3)
             out = out.strip()
             # 防截断：改写结果明显变短（<60%）时保留原文
             if len(out) >= 0.6 * len(body):
