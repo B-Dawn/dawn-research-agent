@@ -55,7 +55,7 @@ ADMIN_ONLY_APIS = ("model_set", "model_profiles")
 
 STATIC_DIR = HERE
 INDEX_FILE = os.path.join(STATIC_DIR, "index.html")
-APP_VERSION = "1.3.0"  # 版本号唯一来源：改这里，页面（标题/登录页/侧栏）自动同步
+APP_VERSION = "1.4.0"  # 版本号唯一来源：改这里，页面（标题/登录页/侧栏）自动同步
 APPJS_FILE = os.path.join(STATIC_DIR, "app.js")
 
 
@@ -1309,6 +1309,47 @@ def api_paperflow(params):
     return {"ok": False, "error": "未知 action：%s" % act}
 
 
+def api_workbench(params):
+    """工作台总览：聚合 BPM 待办/流程、十步走进度、选题全流程与论文全流程状态。"""
+    by = _who(params)
+    data = {}
+    try:
+        ov = bpm.overview(by)
+        data["bpm_todo"] = len(ov.get("todo") or [])
+        data["bpm_running"] = len([i for i in (ov.get("mine") or []) if i.get("status") == "running"])
+    except Exception:
+        data["bpm_todo"] = data["bpm_running"] = 0
+    try:
+        g = wb.guide_load(by) or {}
+        data["guide"] = {"done": len([k for k in g if k.startswith("s") and g.get(k)])}
+    except Exception:
+        data["guide"] = {"done": 0}
+    try:
+        pst = pipeline.state(by)
+        sts = pst.get("stages") or []
+        data["pipeline_total"] = len(sts)
+        data["pipeline_done"] = len([x for x in sts if x.get("status") == "ok"])
+        data["pipeline_stages"] = [{"name": x.get("name"), "status": x.get("status"),
+                                    "note": x.get("note") or x.get("error") or ""} for x in sts]
+    except Exception:
+        data["pipeline_total"] = data["pipeline_done"] = 0
+        data["pipeline_stages"] = []
+    try:
+        pf = paperflow.state(by)
+        sts = pf.get("stages") or {}
+        data["pf_round"] = pf.get("round") or 0
+        data["pf_done"] = bool(pf.get("done"))
+        data["pf_stages"] = [{"name": (_s.get("name") if isinstance(_s, dict) else k),
+                              "status": (v.get("status") if isinstance(v, dict) else "todo"),
+                              "note": ((v.get("note") or v.get("error") or "") if isinstance(v, dict) else "")}
+                             for k, v in sts.items()]
+    except Exception:
+        data["pf_round"] = 0
+        data["pf_done"] = False
+        data["pf_stages"] = []
+    return {"ok": True, "data": data}
+
+
 def api_dataset(params):
     """实验数据集：从论文/开题提取数据集名 → Zenodo 检索 → 下载。"""
     action = params.get("action") or "search"
@@ -2148,6 +2189,7 @@ API_MAP = {
     "bpm": api_bpm,
     "pipeline": api_pipeline,
     "paperflow": api_paperflow,
+    "workbench": api_workbench,
     "agent": api_agent,
     "dataset": api_dataset,
     "format": api_format,

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>破晓 · 科研智能体 v__APP_VERSION__</title>
+<title>破晓 · 科研工作台 v__APP_VERSION__</title>
 <style>
   :root{
     /* 默认皮肤：白蓝（清爽） */
@@ -245,7 +245,7 @@
   <div class="card">
     <div class="logo">🛰️</div>
     <h1 style="margin:0 0 4px">破晓</h1>
-    <p class="sub" style="margin:0 0 18px">科研智能体 · v__APP_VERSION__ · by B_Dawn · 请登录后使用</p>
+    <p class="sub" style="margin:0 0 18px">科研工作台 · v__APP_VERSION__ · 登录后使用</p>
     <div class="row"><div style="flex:1"><label>用户名</label><input id="g-name" placeholder="请输入用户名" autocomplete="username" maxlength="32"></div></div>
     <div class="row hidden" id="g-role-row"><div style="flex:1"><label>注册身份</label>
       <select id="g-role" style="width:100%">
@@ -265,11 +265,12 @@
 </div>
 <div class="layout">
   <aside class="sidebar">
-    <div class="brand">破晓<small>科研智能体 · v__APP_VERSION__ · by B_Dawn</small></div>
+    <div class="brand">破晓<small>科研工作台 · v__APP_VERSION__</small></div>
     <nav class="nav" id="nav">
-      <button data-tab="guide">🧭 论文十步走</button>
-      <button data-tab="paperfull">📄 论文全流程</button>
-      <button data-tab="chat" class="active">💬 智能对话</button>
+      <button data-tab="workbench" class="active">工作台</button>
+      <button data-tab="guide">论文十步走</button>
+      <button data-tab="paperfull">论文全流程</button>
+      <button data-tab="chat">智能对话</button>
       <div class="nav-group">
         <button class="nav-head">📚 文献与精读<span class="caret">▾</span></button>
         <div class="nav-sub">
@@ -280,7 +281,7 @@
         </div>
       </div>
       <div class="nav-group">
-        <button class="nav-head">✍️ 写作与投稿<span class="caret">▾</span></button>
+        <button class="nav-head">写作与投稿<span class="caret">▾</span></button>
         <div class="nav-sub">
           <button data-tab="write">写作综述</button>
           <button data-tab="mypaper">我的论文</button>
@@ -312,13 +313,13 @@
         </div>
       </div>
       <div class="nav-group">
-        <button class="nav-head">⚙️ 个人中心<span class="caret">▾</span></button>
+        <button class="nav-head">个人中心<span class="caret">▾</span></button>
         <div class="nav-sub">
           <button data-tab="profile">科研画像</button>
           <button data-tab="recommend">方向推荐</button>
           <button data-tab="memory">长期记忆</button>
           <button data-tab="modelapi">🔧 模型与API</button>
-          <button data-tab="settings">⚙️ 设置</button>
+          <button data-tab="settings">设置</button>
         </div>
       </div>
       <div class="nav-group" id="nav-admin" style="display:none">
@@ -1244,6 +1245,22 @@
         <div id="pf-report" class="md" style="margin-top:10px"></div>
       </div>
     </section>
+    <section data-pane="workbench" class="hidden">
+      <div class="card" id="wb-cards"><h3 style="margin-top:0">工作总览</h3><p class="chat-hint">加载中…</p></div>
+      <div class="card" id="wb-quick">
+        <h3 style="margin-top:0">常用功能</h3>
+        <div class="bpm-acts" style="flex-wrap:wrap">
+          <button class="run" data-goto="guide">论文十步走</button>
+          <button class="run ghost" data-goto="paperfull">论文全流程</button>
+          <button class="run ghost" data-goto="search">文献检索</button>
+          <button class="run ghost" data-goto="reflib">文献库</button>
+          <button class="run ghost" data-goto="bpm">流程中心</button>
+          <button class="run ghost" data-goto="lab">实验台账</button>
+          <button class="run ghost" data-goto="chat">智能对话</button>
+        </div>
+      </div>
+      <div class="card" id="wb-stages"><h3 style="margin-top:0">进行中的流程</h3><p class="chat-hint">加载中…</p></div>
+    </section>
     <section data-pane="guide" class="hidden">
       <div class="card">
         <h3 style="margin-top:0">⚡ 一键全流程 <span style="font-weight:400;color:var(--muted);font-size:12px">（自动跑完「交给人工审核之前」的全部内容：①定方向 →②文献调研 →③创新点/可行性 →④苏格拉底问询定题 →⑤提交人工审核。<b>只有经过苏格拉底问询并逐条回应的题目才合格</b>，合格后才送审）</span></h3>
@@ -1338,6 +1355,7 @@
 <script src="app.js?v=__APP_VERSION__"></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("[data-goto]").forEach(b => b.addEventListener("click", () => switchTab(b.dataset.goto)));
   const pr = document.getElementById("pf-run");
   if (pr) pr.addEventListener("click", () => { if (typeof pfRun === "function") pfRun(); });
   const prf = document.getElementById("pf-refresh");

@@ -191,10 +191,11 @@ async function doLogout() {
 
 // ---------------- 标签页 ----------------
 const TITLES = {
-  chat: ["智能对话", "用自然语言指挥科研智能体：检索、对比矩阵、选刊、方向推荐、团队协作与实验复现。"],
+  workbench: ["工作台", "总览：待办、流程进度、十步走与全流程状态。"],
+  chat: ["智能对话", "自然语言操作入口：检索、矩阵、选刊、多步任务与审批查询。"],
   paperfull: ["论文全流程", "从题目到终稿：问询→实验（本机真实训练）→论文→盲审→修改→终稿。"],
-  guide: ["论文十步走", "第一次写论文？按十步流程图一步步完成：每步告诉你为什么做、怎么做、用哪个模块、交付什么。"],
-  bpm: ["流程中心", "审批流转（对齐 JeecgBoot/Flowable）：流程定义 → 发起 → 我的待办 → 通过/驳回/转办/委派/加签/抄送 → 流程跟踪。引擎为确定性逻辑，不依赖 AI。"],
+  guide: ["论文十步走", "按十个阶段推进论文：每个阶段说明目标、操作方式与交付物，进度自动保存。"],
+  bpm: ["流程中心", "审批流转：流程定义、发起、待办办理（通过/驳回/转办/委派/加签/抄送）与流程跟踪。"],
   team: ["协作中心", "成员档案与任务板分工；合作邀请在「合作对接」，共同写论文去「论文协作」。"],
   collab: ["合作对接", "向系统内其他注册用户发起合作邀请；接受后互为合作者，再到「论文协作」授权共同写作。"],
   paper: ["论文协作", "论文项目：章节草稿 / 审阅意见 / 协作者权限（可编辑·仅查看）；项目自动收录进协作者「我的论文」。"],
@@ -235,6 +236,8 @@ function switchTab(tab) {
   if (tab === "memory") { loadMems(); }
   if (tab === "mypaper") { loadMyPapers(); loadDpPapers(); }
   if (tab === "guide") { bootGuide(); plLoadState(); }
+  if (tab === "paperfull") { pfBoot(); }
+  if (tab === "workbench") { bootWorkbench(); }
   if (tab === "bpm") { bpmBoot(); }
   if (tab === "chat") { refreshChatSelectors(); refreshChatModelBadge(); }
   if (tab === "reflib") { loadFolders(); }
@@ -356,30 +359,23 @@ function renderChatActions(module) {
 
 function chatWelcome() {
   const md =
-    "你好，我是**破晓**，你的论文全流程助手（🧭 论文十步走）。可以直接说：\n\n" +
-    "**从零开始（工作流）：**\n" +
-    "- **一键全流程**：自动跑完「交给人工审核之前」的全部内容 —— ①定方向 →②文献调研 →③创新点/可行性 →④苏格拉底问询定题 →⑤提交人工审核\n" +
-    "- 也可以：粘贴你的**个人简历/擅长技术**，我按十步走帮你把方向定下来\n" +
-    "- 苏格拉底问询 / 定题目 / 全流程进度 / 继续全流程\n" +
-    "- 确认方向：<最终方向>（定稿后自动进入文献调研）\n\n" +
-    "**文献与写作：**\n" +
-    "- 检索 UAV 入侵检测 近三年论文 / 把刚才的结果生成对比矩阵\n" +
-    "- 帮我选刊：<粘贴摘要>（可选国际/国内/全部）\n" +
-    "- 推荐下个研究方向 / 我的论文\n\n" +
-    "**实验与团队：**\n" +
-    "- 登记实验 <名称> / 查一下实验台账 / 校验：<粘贴CSV>\n" +
+    "**指令速查**（对话可直接输入）：\n\n" +
+    "**选题全流程**\n" +
+    "- 一键全流程 / 继续全流程 / 全流程进度\n" +
+    "- 苏格拉底问询 / 定题目 / 提交审核\n\n" +
+    "**文献与投稿**\n" +
+    "- 检索 <关键词>（如：检索 UAV 入侵检测 近三年）\n" +
+    "- 把刚才的结果生成对比矩阵 / 收录到文献库\n" +
+    "- 帮我选刊 / 我的论文\n\n" +
+    "**实验与协作**\n" +
+    "- 登记实验 <名称> / 查一下实验台账\n" +
     "- 看看任务进度 / 新建论文 <标题>\n\n" +
-    "**🧠 多步任务（我会自动串起来做）：**\n" +
-    "- `检索 UAV 入侵检测 最新论文，然后精读前三篇，再帮我选刊`\n" +
-    "- `检索 图神经网络 入侵检测，然后生成对比矩阵并收录到文献库`\n" +
-    "- 我会先**规划**，再逐步**调用工具**，你能看到每一步的「参数 / 观察结果」；复杂目标可加 `/智能模式` 强制执行\n" +
-    "- 说「你会什么」可以看我能调用的全部工具\n\n" +
-    "**审批流程（🔀 流程中心）：**\n" +
-    "- 我的待办 / 我发起的流程 / 发起流程\n" +
-    "- 内置模板：论文送审审批、开题报告审批、实验资源申请、通用审批；支持通过/驳回/转办/委派/加签/抄送/会签/条件分支\n\n" +
-    "**记忆：** 记住：<内容> / 查看记忆\n\n" +
-    "> 技能在各模块内调用（检索页有「是否调用」开关）；自定义技能在「设置 → 技能中心」上传。当前为**离线环境**时检索类返回空并提示；统计分析/团队协作无需联网。";
-  addAgent(md);
+    "**多步任务**\n" +
+    "- 检索 <关键词>，然后精读前三篇，再帮我选刊\n" +
+    "- 检索 <关键词>，然后生成对比矩阵并收录到文献库\n\n" +
+    "**审批**\n" +
+    "- 我的待办 / 我发起的流程 / 我的抄送 / 发起审批\n\n" +
+    "输入「你会什么」查看全部可用工具；复杂多步任务可用 /智能模式 强制执行。";
 }
 async function sendChat() {
   if (chatting) return;
@@ -3039,3 +3035,48 @@ const pfRun = async () => {
   const r = await post("paperflow", { action: "run", topic: topic });
   setStatus("pf-report", r && r.ok ? "已启动" : ((r && r.error) || "启动失败"), r && r.ok ? "ok" : "err");
 };
+
+
+// ================================================================
+// 工作台（总览）
+// ================================================================
+let _wbLoaded = false;
+async function bootWorkbench(force) {
+  if (_wbLoaded && !force) return;
+  const box = $("wb-cards"), st = $("wb-stages");
+  const r = await post("workbench", { action: "overview" });
+  if (!r || !r.ok) {
+    if (box) box.innerHTML = '<p class="chat-hint">加载失败：' + esc((r && r.error) || "") + "</p>";
+    return;
+  }
+  _wbLoaded = true;
+  const d = r.data || {};
+  if (box) {
+    const card = (label, value, sub) =>
+      '<div class="card" style="flex:1;min-width:150px;margin:0;padding:14px 16px">' +
+      '<div style="font-size:26px;font-weight:700">' + value + "</div>" +
+      '<div style="color:var(--muted);font-size:12px;margin-top:4px">' + esc(label) + "</div>" +
+      (sub ? '<div style="color:var(--muted);font-size:11px;margin-top:2px">' + esc(sub) + "</div>" : "") +
+      "</div>";
+    const g = d.guide || {};
+    box.innerHTML = '<h3 style="margin-top:0">工作总览</h3>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
+      card("我的待办", d.bpm_todo || 0, "流程中心处理") +
+      card("进行中流程", d.bpm_running || 0, "我发起的") +
+      card("论文十步走", (g.done || 0) + " / 10", "已完成的阶段") +
+      card("全流程环节", d.pipeline_done + " / " + d.pipeline_total, "选题全流程") +
+      card("论文盲审轮次", d.pf_round || 0, d.pf_done ? "已达标" : (d.pf_round ? "迭代中" : "未开始")) +
+      "</div>";
+  }
+  if (st) {
+    const rows = [];
+    (d.pipeline_stages || []).forEach(x => rows.push([x.name, x.status, (x.note || x.error || "").slice(0, 70)]));
+    (d.pf_stages || []).forEach(x => rows.push([x.name, x.status, (x.note || x.error || "").slice(0, 70)]));
+    const icon = { ok: "完成", warn: "注意", blocked: "受阻", fail: "失败", skip: "跳过", todo: "待开始" };
+    st.innerHTML = rows.length
+      ? '<table class="tbl"><tr><th>环节</th><th>状态</th><th>说明</th></tr>' +
+        rows.map(x => "<tr><td>" + esc(x[0]) + "</td><td>" + esc(icon[x[1]] || x[1]) +
+          "</td><td>" + esc(x[2]) + "</td></tr>").join("") + "</table>"
+      : '<p class="chat-hint">暂无进行中的流程。从「论文十步走」或「论文全流程」开始。</p>';
+  }
+}
